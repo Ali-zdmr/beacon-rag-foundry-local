@@ -21,6 +21,9 @@
         <button class="nav-item" data-view="docs">
           <span class="nav-icon">&#128196;</span><span data-i18n="nav.docs">Documents</span>
         </button>
+        <button class="nav-item" data-view="tests">
+          <span class="nav-icon">&#129514;</span><span data-i18n="nav.tests">Tests</span>
+        </button>
         <button class="nav-item" data-view="settings">
           <span class="nav-icon">&#9881;&#65039;</span><span data-i18n="nav.settings">Settings</span>
         </button>
@@ -76,10 +79,11 @@
 
         <div id="doc-stats" class="doc-stats"></div>
 
-        <form id="upload-form" class="upload-form">
-          <input id="upload-input" type="file" accept=".md,.txt" />
-          <button type="submit" data-i18n="docs.upload">Upload</button>
-        </form>
+        <div id="dropzone" class="dropzone">
+          <div class="dropzone-icon">&#128193;</div>
+          <div data-i18n="docs.dropzone">Drag files here, or click to browse</div>
+          <input id="upload-input" type="file" accept=".md,.txt" multiple hidden />
+        </div>
         <p class="hint" data-i18n="docs.hint">
           Only .md and .txt files are supported. Uploading or deleting a file automatically rebuilds the index.
         </p>
@@ -108,6 +112,14 @@
             <label data-i18n="settings.showSources">Show retrieved passages under each answer</label>
             <div class="setting-control">
               <input id="setting-show-sources" type="checkbox" checked />
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <label data-i18n="settings.confidence">Low-confidence threshold (similarity score)</label>
+            <div class="setting-control">
+              <input id="setting-confidence" type="range" min="0" max="0.6" step="0.02" value="0.15" />
+              <span id="setting-confidence-value">0.15</span>
             </div>
           </div>
 
@@ -141,6 +153,29 @@
           <h3 data-i18n="settings.pipeline">Pipeline configuration</h3>
           <div id="pipeline-details" class="backend-details">&hellip;</div>
         </div>
+      </section>
+
+      <!-- TESTS VIEW -->
+      <section id="view-tests" class="view">
+        <header class="topbar">
+          <h2 data-i18n="tests.title">Test set</h2>
+          <button id="btn-run-all-tests" class="ghost-btn" data-i18n="tests.runAll">Run all</button>
+        </header>
+
+        <p class="hint" data-i18n="tests.hint">
+          Add questions you expect the assistant to answer correctly - and some it should
+          honestly say it can't answer. Run them, read the result, and mark it pass or fail.
+        </p>
+
+        <div id="tests-summary" class="doc-stats"></div>
+
+        <form id="test-form" class="upload-form">
+          <input id="test-question" type="text" data-i18n-placeholder="tests.questionPlaceholder" placeholder="Test question..." />
+          <input id="test-note" type="text" data-i18n-placeholder="tests.notePlaceholder" placeholder="Expected (optional)..." />
+          <button type="submit" data-i18n="tests.add">Add</button>
+        </form>
+
+        <ul id="test-list" class="doc-list"></ul>
       </section>
 
       <!-- ABOUT VIEW -->

@@ -1,0 +1,29 @@
+[
+  {
+    "id": "seed0001",
+    "question": "What is Retrieval-Augmented Generation?",
+    "expected_note": "Answerable - should cite rag_overview.md",
+    "verdict": null,
+    "last_answer": null,
+    "last_sources": [],
+    "last_run_at": null
+  },
+  {
+    "id": "seed0002",
+    "question": "Why is SQLite a good fit for a small local knowledge base?",
+    "expected_note": "Answerable - should cite sqlite_for_local_storage.md",
+    "verdict": null,
+    "last_answer": null,
+    "last_sources": [],
+    "last_run_at": null
+  },
+  {
+    "id": "seed0003",
+    "question": "What is the capital of France?",
+    "expected_note": "Not in the knowledge base - should say it doesn't know, not guess",
+    "verdict": null,
+    "last_answer": null,
+    "last_sources": [],
+    "last_run_at": null
+  }
+]

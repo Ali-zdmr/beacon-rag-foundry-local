@@ -1,11 +1,13 @@
 """Flask web UI for the local RAG assistant.
 
-Four views in one page: Chat (ask questions, see cited/retrieved passages),
-Documents (see what's indexed, upload new .md/.txt files, delete, reindex,
-preview a document's chunks), Settings (top-k, whether to show retrieved
-passages, theme, language, active model info), and About (a short pipeline
-explainer for presentations). Everything here is a thin wrapper around the
-same src.* pipeline used by the CLI - no logic lives only in the web layer.
+Five views in one page: Chat (ask questions, see cited/retrieved passages),
+Documents (see what's indexed, upload/drag-drop new .md/.txt files, delete,
+reindex, preview a document's chunks), Tests (the assignment's Phase 3 test
+set: add questions, run them against the live pipeline, mark pass/fail),
+Settings (top-k, whether to show retrieved passages, theme, language, active
+model info), and About (a short pipeline explainer for presentations).
+Everything here is a thin wrapper around the same src.* pipeline used by the
+CLI - no logic lives only in the web layer.
 
 Usage:
     python -m src.webapp
@@ -17,7 +19,7 @@ from pathlib import Path
 from flask import Flask, jsonify, request, render_template
 from werkzeug.utils import secure_filename
 
-from . import config, db
+from . import config, db, testsuite
 from .embeddings import get_embedding_backend
 from .ingest import run as ingest_run
 from .llm import get_llm_backend
@@ -105,23 +107,26 @@ def document_chunks(filename):
 
 @app.post("/api/documents")
 def upload_document():
-    if "file" not in request.files:
+    files = request.files.getlist("files") or request.files.getlist("file")
+    if not files:
         return jsonify({"error": "no file provided"}), 400
-    file = request.files["file"]
-    filename = secure_filename(file.filename or "")
-    if not filename:
-        return jsonify({"error": "invalid filename"}), 400
-    if Path(filename).suffix.lower() not in ALLOWED_EXTENSIONS:
-        return jsonify({"error": "only .md and .txt files are supported"}), 400
 
     config.DOCS_DIR.mkdir(parents=True, exist_ok=True)
-    file.save(config.DOCS_DIR / filename)
+    saved, skipped = [], []
+    for file in files:
+        filename = secure_filename(file.filename or "")
+        if not filename or Path(filename).suffix.lower() not in ALLOWED_EXTENSIONS:
+            skipped.append(file.filename or "?")
+            continue
+        file.save(config.DOCS_DIR / filename)
+        saved.append(filename)
 
-    try:
-        _reindex()
-    except SystemExit as exc:
-        return jsonify({"error": str(exc)}), 500
-    return jsonify({"ok": True, "filename": filename})
+    if saved:
+        try:
+            _reindex()
+        except SystemExit as exc:
+            return jsonify({"error": str(exc)}), 500
+    return jsonify({"ok": True, "saved": saved, "skipped": skipped})
 
 
 @app.delete("/api/documents/<path:filename>")
@@ -171,6 +176,69 @@ def ask():
     result["elapsed_ms"] = round((time.perf_counter() - started) * 1000)
 
     return jsonify(result)
+
+
+def _run_case(case: dict, embedder, llm) -> dict:
+    """Raises EmbeddingBackendMismatch - callers decide how to report it."""
+    result = answer_question(case["question"], embedder=embedder, llm=llm)
+    return testsuite.update_result(case["id"], result["answer"], result["sources"])
+
+
+@app.get("/api/tests")
+def list_tests():
+    return jsonify({"tests": testsuite.list_cases()})
+
+
+@app.post("/api/tests")
+def add_test():
+    payload = request.get_json(silent=True) or {}
+    question = (payload.get("question") or "").strip()
+    if not question:
+        return jsonify({"error": "question is required"}), 400
+    expected_note = (payload.get("expected_note") or "").strip()
+    return jsonify(testsuite.add_case(question, expected_note))
+
+
+@app.delete("/api/tests/<case_id>")
+def delete_test(case_id):
+    testsuite.delete_case(case_id)
+    return jsonify({"ok": True})
+
+
+@app.post("/api/tests/<case_id>/run")
+def run_test(case_id):
+    case = testsuite.get_case(case_id)
+    if not case:
+        return jsonify({"error": "test case not found"}), 404
+    embedder, llm = _backends()
+    try:
+        updated = _run_case(case, embedder, llm)
+    except EmbeddingBackendMismatch as exc:
+        return jsonify({"error": str(exc)}), 409
+    return jsonify(updated)
+
+
+@app.post("/api/tests/run-all")
+def run_all_tests():
+    embedder, llm = _backends()
+    for case in testsuite.list_cases():
+        try:
+            _run_case(case, embedder, llm)
+        except EmbeddingBackendMismatch as exc:
+            return jsonify({"error": str(exc)}), 409
+    return jsonify({"tests": testsuite.list_cases()})
+
+
+@app.post("/api/tests/<case_id>/verdict")
+def set_test_verdict(case_id):
+    payload = request.get_json(silent=True) or {}
+    verdict = payload.get("verdict")
+    if verdict not in ("pass", "fail", None):
+        return jsonify({"error": "verdict must be 'pass', 'fail', or null"}), 400
+    updated = testsuite.set_verdict(case_id, verdict)
+    if not updated:
+        return jsonify({"error": "test case not found"}), 404
+    return jsonify(updated)
 
 
 def main() -> None:

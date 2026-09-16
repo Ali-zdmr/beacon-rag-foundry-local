@@ -3,7 +3,13 @@
 const SETTINGS_KEY = "beacon.settings";
 
 function loadSettings() {
-  const defaults = { theme: "dark", lang: "tr", topK: 3, showSources: true };
+  const defaults = {
+    theme: "dark",
+    lang: "tr",
+    topK: 3,
+    showSources: true,
+    confidenceThreshold: 0.15,
+  };
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
     return raw ? { ...defaults, ...JSON.parse(raw) } : defaults;
@@ -43,13 +49,22 @@ const btnExportChat = document.getElementById("btn-export-chat");
 const docStats = document.getElementById("doc-stats");
 const docSearch = document.getElementById("doc-search");
 const docList = document.getElementById("doc-list");
-const uploadForm = document.getElementById("upload-form");
+const dropzone = document.getElementById("dropzone");
 const uploadInput = document.getElementById("upload-input");
 const btnReindex = document.getElementById("btn-reindex");
+
+const testsSummary = document.getElementById("tests-summary");
+const testForm = document.getElementById("test-form");
+const testQuestion = document.getElementById("test-question");
+const testNote = document.getElementById("test-note");
+const testList = document.getElementById("test-list");
+const btnRunAllTests = document.getElementById("btn-run-all-tests");
 
 const topkInput = document.getElementById("setting-topk");
 const topkValue = document.getElementById("setting-topk-value");
 const showSourcesInput = document.getElementById("setting-show-sources");
+const confidenceInput = document.getElementById("setting-confidence");
+const confidenceValue = document.getElementById("setting-confidence-value");
 const themeSelect = document.getElementById("setting-theme");
 const langSelect = document.getElementById("setting-lang");
 const backendDetails = document.getElementById("backend-details");
@@ -65,6 +80,7 @@ navItems.forEach((btn) => {
     document.getElementById(`view-${btn.dataset.view}`).classList.add("active");
     if (btn.dataset.view === "docs") loadDocuments();
     if (btn.dataset.view === "settings") loadStatus();
+    if (btn.dataset.view === "tests") loadTests();
   });
 });
 
@@ -74,13 +90,41 @@ function formatTime(date) {
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+function revealText(el, text) {
+  const total = text.length;
+  const duration = Math.min(900, Math.max(200, total * 4));
+  const start = performance.now();
+  function frame(now) {
+    const progress = Math.min(1, (now - start) / duration);
+    el.textContent = text.slice(0, Math.floor(progress * total));
+    log.scrollTop = log.scrollHeight;
+    if (progress < 1) requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+}
+
+function confidenceInfo(chunks) {
+  if (!chunks || !chunks.length) {
+    return { cls: "none", label: t(settings.lang, "chat.confidenceNone") };
+  }
+  const top = chunks[0].score;
+  if (top < settings.confidenceThreshold) {
+    return { cls: "low", label: `${t(settings.lang, "chat.confidenceLow")} (${top})` };
+  }
+  return { cls: "good", label: `${t(settings.lang, "chat.confidenceGood")} (${top})` };
+}
+
 function addMessage(role, text, options = {}) {
-  const { chunks, elapsedMs } = options;
+  const { chunks, elapsedMs, animate } = options;
   const div = document.createElement("div");
   div.className = `msg ${role}`;
   const p = document.createElement("p");
-  p.textContent = text;
   div.appendChild(p);
+  if (role === "assistant" && animate) {
+    revealText(p, text);
+  } else {
+    p.textContent = text;
+  }
 
   if (role === "assistant" && settings.showSources && chunks && chunks.length) {
     const wrap = document.createElement("div");
@@ -114,6 +158,14 @@ function addMessage(role, text, options = {}) {
     meta.appendChild(timeSpan);
 
     if (role === "assistant") {
+      if (chunks !== undefined) {
+        const info = confidenceInfo(chunks);
+        const badge = document.createElement("span");
+        badge.className = `confidence-badge ${info.cls}`;
+        badge.textContent = info.label;
+        meta.appendChild(badge);
+      }
+
       const copyBtn = document.createElement("button");
       copyBtn.className = "msg-copy-btn";
       copyBtn.textContent = t(settings.lang, "chat.copy");
@@ -162,7 +214,11 @@ async function ask(text) {
     if (!res.ok) {
       addMessage("error", data.error || t(settings.lang, "chat.noAnswer"));
     } else {
-      addMessage("assistant", data.answer, { chunks: data.chunks, elapsedMs: data.elapsed_ms });
+      addMessage("assistant", data.answer, {
+        chunks: data.chunks,
+        elapsedMs: data.elapsed_ms,
+        animate: true,
+      });
     }
   } catch (err) {
     typingEl.remove();
@@ -340,15 +396,35 @@ async function deleteDocument(filename) {
   loadStatus();
 }
 
-uploadForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  if (!uploadInput.files.length) return;
+async function uploadFiles(fileList) {
+  const files = Array.from(fileList || []);
+  if (!files.length) return;
   const formData = new FormData();
-  formData.append("file", uploadInput.files[0]);
+  files.forEach((f) => formData.append("files", f));
   await fetch("/api/documents", { method: "POST", body: formData });
-  uploadInput.value = "";
   loadDocuments();
   loadStatus();
+}
+
+dropzone.addEventListener("click", () => uploadInput.click());
+uploadInput.addEventListener("change", () => {
+  uploadFiles(uploadInput.files);
+  uploadInput.value = "";
+});
+["dragenter", "dragover"].forEach((evt) =>
+  dropzone.addEventListener(evt, (e) => {
+    e.preventDefault();
+    dropzone.classList.add("dragover");
+  })
+);
+["dragleave", "drop"].forEach((evt) =>
+  dropzone.addEventListener(evt, (e) => {
+    e.preventDefault();
+    dropzone.classList.remove("dragover");
+  })
+);
+dropzone.addEventListener("drop", (e) => {
+  uploadFiles(e.dataTransfer.files);
 });
 
 btnReindex.addEventListener("click", async () => {
@@ -357,12 +433,148 @@ btnReindex.addEventListener("click", async () => {
   loadStatus();
 });
 
+// ---- tests --------------------------------------------------------------
+
+function renderTestStats(tests) {
+  const total = tests.length;
+  const passed = tests.filter((c) => c.verdict === "pass").length;
+  const failed = tests.filter((c) => c.verdict === "fail").length;
+  testsSummary.innerHTML = `
+    <div><strong>${total}</strong>${t(settings.lang, "tests.statsTotal")}</div>
+    <div><strong>${passed}</strong>${t(settings.lang, "tests.statsPassed")}</div>
+    <div><strong>${failed}</strong>${t(settings.lang, "tests.statsFailed")}</div>
+  `;
+}
+
+function renderTestList(tests) {
+  testList.innerHTML = "";
+  if (!tests.length) {
+    testList.innerHTML = `<li class="hint">${t(settings.lang, "tests.empty")}</li>`;
+    return;
+  }
+
+  tests.forEach((tc) => {
+    const li = document.createElement("li");
+    li.className = "doc-row";
+
+    const main = document.createElement("div");
+    main.className = "test-row-main";
+
+    const info = document.createElement("div");
+    info.className = "test-info";
+    let infoHtml = `<div class="test-question">${tc.question}</div>`;
+    if (tc.expected_note) infoHtml += `<div class="test-note">${tc.expected_note}</div>`;
+    infoHtml += `<div class="test-meta">${tc.last_run_at ? tc.last_run_at : t(settings.lang, "tests.notRun")}</div>`;
+    info.innerHTML = infoHtml;
+
+    const actions = document.createElement("div");
+    actions.className = "test-row-actions";
+
+    const runBtn = document.createElement("button");
+    runBtn.className = "ghost-btn";
+    runBtn.textContent = t(settings.lang, "tests.run");
+    runBtn.addEventListener("click", () => runTest(tc.id));
+
+    const passBtn = document.createElement("button");
+    passBtn.className = `verdict-btn pass ${tc.verdict === "pass" ? "active" : ""}`;
+    passBtn.textContent = t(settings.lang, "tests.pass");
+    passBtn.addEventListener("click", () => setVerdict(tc.id, tc.verdict === "pass" ? null : "pass"));
+
+    const failBtn = document.createElement("button");
+    failBtn.className = `verdict-btn fail ${tc.verdict === "fail" ? "active" : ""}`;
+    failBtn.textContent = t(settings.lang, "tests.fail");
+    failBtn.addEventListener("click", () => setVerdict(tc.id, tc.verdict === "fail" ? null : "fail"));
+
+    const delBtn = document.createElement("button");
+    delBtn.className = "doc-delete";
+    delBtn.textContent = t(settings.lang, "tests.delete");
+    delBtn.addEventListener("click", () => deleteTest(tc.id));
+
+    actions.appendChild(runBtn);
+    actions.appendChild(passBtn);
+    actions.appendChild(failBtn);
+    actions.appendChild(delBtn);
+    main.appendChild(info);
+    main.appendChild(actions);
+    li.appendChild(main);
+
+    if (tc.last_answer) {
+      const answerEl = document.createElement("div");
+      answerEl.className = "test-answer";
+      answerEl.textContent = tc.last_answer;
+      li.appendChild(answerEl);
+    }
+
+    testList.appendChild(li);
+  });
+}
+
+function renderTests(tests) {
+  renderTestStats(tests);
+  renderTestList(tests);
+}
+
+async function loadTests() {
+  try {
+    const res = await fetch("/api/tests");
+    const data = await res.json();
+    renderTests(data.tests || []);
+  } catch (err) {
+    testList.innerHTML = `<li class="hint">${t(settings.lang, "chat.noServer")}</li>`;
+  }
+}
+
+testForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const q = testQuestion.value.trim();
+  if (!q) return;
+  await fetch("/api/tests", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question: q, expected_note: testNote.value.trim() }),
+  });
+  testQuestion.value = "";
+  testNote.value = "";
+  loadTests();
+});
+
+async function runTest(id) {
+  await fetch(`/api/tests/${id}/run`, { method: "POST" });
+  loadTests();
+}
+
+btnRunAllTests.addEventListener("click", async () => {
+  btnRunAllTests.disabled = true;
+  try {
+    await fetch("/api/tests/run-all", { method: "POST" });
+    loadTests();
+  } finally {
+    btnRunAllTests.disabled = false;
+  }
+});
+
+async function deleteTest(id) {
+  await fetch(`/api/tests/${id}`, { method: "DELETE" });
+  loadTests();
+}
+
+async function setVerdict(id, verdict) {
+  await fetch(`/api/tests/${id}/verdict`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ verdict }),
+  });
+  loadTests();
+}
+
 // ---- settings -----------------------------------------------------------
 
 function initSettingsUI() {
   topkInput.value = settings.topK;
   topkValue.textContent = settings.topK;
   showSourcesInput.checked = settings.showSources;
+  confidenceInput.value = settings.confidenceThreshold;
+  confidenceValue.textContent = settings.confidenceThreshold;
   themeSelect.value = settings.theme;
   langSelect.value = settings.lang;
 }
@@ -375,6 +587,12 @@ topkInput.addEventListener("input", () => {
 
 showSourcesInput.addEventListener("change", () => {
   settings.showSources = showSourcesInput.checked;
+  saveSettings(settings);
+});
+
+confidenceInput.addEventListener("input", () => {
+  settings.confidenceThreshold = parseFloat(confidenceInput.value);
+  confidenceValue.textContent = settings.confidenceThreshold;
   saveSettings(settings);
 });
 
