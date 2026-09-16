@@ -11,10 +11,7 @@
     <aside class="sidebar">
       <div class="brand">
         <span class="beacon"><span class="beacon-beam"></span></span>
-        <div class="brand-text">
-          <h1>Beacon</h1>
-          <p class="brand-tagline" data-i18n="brand.tagline">Only lights what's real</p>
-        </div>
+        <h1>Beacon</h1>
       </div>
 
       <nav class="nav">
@@ -34,6 +31,21 @@
           <span class="nav-icon">&#128161;</span><span data-i18n="nav.about">About</span>
         </button>
       </nav>
+
+      <div class="sidebar-overview">
+        <div class="overview-title" data-i18n="sidebar.overviewTitle">Overview</div>
+        <div class="overview-grid">
+          <div class="overview-item"><strong id="ov-docs">0</strong><span data-i18n="sidebar.ovDocs">docs</span></div>
+          <div class="overview-item"><strong id="ov-chunks">0</strong><span data-i18n="sidebar.ovChunks">chunks</span></div>
+          <div class="overview-item"><strong id="ov-tests">0/0</strong><span data-i18n="sidebar.ovTests">tests passed</span></div>
+          <div class="overview-item"><strong id="ov-questions">0</strong><span data-i18n="sidebar.ovQuestions">asked</span></div>
+        </div>
+
+        <div class="overview-title activity-title" data-i18n="sidebar.activityTitle">Recent activity</div>
+        <ul id="activity-list" class="activity-list">
+          <li class="activity-empty" data-i18n="sidebar.activityEmpty">Nothing yet</li>
+        </ul>
+      </div>
 
       <div class="sidebar-footer">
         <div class="offline-badge">

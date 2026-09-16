@@ -28,9 +28,36 @@ function saveSettings(settings) {
 
 let settings = loadSettings();
 let lastStatus = null;
+let sessionQuestionCount = 0;
+let activityLog = [];
 
 function applyTheme(theme) {
   document.documentElement.setAttribute("data-theme", theme);
+}
+
+// ---- sidebar overview + activity log --------------------------------------
+
+function pushActivity(labelKey, detail) {
+  const time = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  activityLog.unshift({ labelKey, detail, time });
+  activityLog = activityLog.slice(0, 6);
+  renderActivity();
+}
+
+function renderActivity() {
+  if (!activityLog.length) {
+    activityList.innerHTML = `<li class="activity-empty">${t(settings.lang, "sidebar.activityEmpty")}</li>`;
+    return;
+  }
+  activityList.innerHTML = "";
+  activityLog.forEach((item) => {
+    const li = document.createElement("li");
+    const label = t(settings.lang, item.labelKey);
+    const text = item.detail ? `${label}: ${item.detail}` : label;
+    li.innerHTML = `<span class="activity-time">${item.time}</span>${text}`;
+    li.title = text;
+    activityList.appendChild(li);
+  });
 }
 
 // ---- element refs -------------------------------------------------------
@@ -45,6 +72,12 @@ const suggestionsEl = document.getElementById("suggestions");
 const sidebarStatus = document.getElementById("sidebar-status");
 const btnClearChat = document.getElementById("btn-clear-chat");
 const btnExportChat = document.getElementById("btn-export-chat");
+
+const ovDocs = document.getElementById("ov-docs");
+const ovChunks = document.getElementById("ov-chunks");
+const ovTests = document.getElementById("ov-tests");
+const ovQuestions = document.getElementById("ov-questions");
+const activityList = document.getElementById("activity-list");
 
 const docStats = document.getElementById("doc-stats");
 const docSearch = document.getElementById("doc-search");
@@ -219,6 +252,9 @@ async function ask(text) {
         elapsedMs: data.elapsed_ms,
         animate: true,
       });
+      sessionQuestionCount += 1;
+      ovQuestions.textContent = sessionQuestionCount;
+      pushActivity("sidebar.actAsked", text.length > 40 ? text.slice(0, 40) + "..." : text);
     }
   } catch (err) {
     typingEl.remove();
@@ -392,6 +428,7 @@ docSearch.addEventListener("input", renderDocList);
 
 async function deleteDocument(filename) {
   await fetch(`/api/documents/${encodeURIComponent(filename)}`, { method: "DELETE" });
+  pushActivity("sidebar.actDeleted", filename);
   loadDocuments();
   loadStatus();
 }
@@ -402,6 +439,8 @@ async function uploadFiles(fileList) {
   const formData = new FormData();
   files.forEach((f) => formData.append("files", f));
   await fetch("/api/documents", { method: "POST", body: formData });
+  const label = files.length === 1 ? files[0].name : `${files.length} files`;
+  pushActivity("sidebar.actUploaded", label);
   loadDocuments();
   loadStatus();
 }
@@ -429,6 +468,7 @@ dropzone.addEventListener("drop", (e) => {
 
 btnReindex.addEventListener("click", async () => {
   await fetch("/api/reindex", { method: "POST" });
+  pushActivity("sidebar.actReindexed", "");
   loadDocuments();
   loadStatus();
 });
@@ -444,6 +484,7 @@ function renderTestStats(tests) {
     <div><strong>${passed}</strong>${t(settings.lang, "tests.statsPassed")}</div>
     <div><strong>${failed}</strong>${t(settings.lang, "tests.statsFailed")}</div>
   `;
+  ovTests.textContent = `${passed}/${total}`;
 }
 
 function renderTestList(tests) {
@@ -470,25 +511,41 @@ function renderTestList(tests) {
     const actions = document.createElement("div");
     actions.className = "test-row-actions";
 
+    const shortQ = tc.question.length > 40 ? tc.question.slice(0, 40) + "..." : tc.question;
+
     const runBtn = document.createElement("button");
     runBtn.className = "ghost-btn";
     runBtn.textContent = t(settings.lang, "tests.run");
-    runBtn.addEventListener("click", () => runTest(tc.id));
+    runBtn.addEventListener("click", () => {
+      pushActivity("sidebar.actTestRun", shortQ);
+      runTest(tc.id);
+    });
 
     const passBtn = document.createElement("button");
     passBtn.className = `verdict-btn pass ${tc.verdict === "pass" ? "active" : ""}`;
     passBtn.textContent = t(settings.lang, "tests.pass");
-    passBtn.addEventListener("click", () => setVerdict(tc.id, tc.verdict === "pass" ? null : "pass"));
+    passBtn.addEventListener("click", () => {
+      const next = tc.verdict === "pass" ? null : "pass";
+      if (next) pushActivity("sidebar.actVerdict", `${t(settings.lang, "tests.pass")} - ${shortQ}`);
+      setVerdict(tc.id, next);
+    });
 
     const failBtn = document.createElement("button");
     failBtn.className = `verdict-btn fail ${tc.verdict === "fail" ? "active" : ""}`;
     failBtn.textContent = t(settings.lang, "tests.fail");
-    failBtn.addEventListener("click", () => setVerdict(tc.id, tc.verdict === "fail" ? null : "fail"));
+    failBtn.addEventListener("click", () => {
+      const next = tc.verdict === "fail" ? null : "fail";
+      if (next) pushActivity("sidebar.actVerdict", `${t(settings.lang, "tests.fail")} - ${shortQ}`);
+      setVerdict(tc.id, next);
+    });
 
     const delBtn = document.createElement("button");
     delBtn.className = "doc-delete";
     delBtn.textContent = t(settings.lang, "tests.delete");
-    delBtn.addEventListener("click", () => deleteTest(tc.id));
+    delBtn.addEventListener("click", () => {
+      pushActivity("sidebar.actTestDeleted", shortQ);
+      deleteTest(tc.id);
+    });
 
     actions.appendChild(runBtn);
     actions.appendChild(passBtn);
@@ -533,6 +590,7 @@ testForm.addEventListener("submit", async (e) => {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ question: q, expected_note: testNote.value.trim() }),
   });
+  pushActivity("sidebar.actTestAdded", q.length > 40 ? q.slice(0, 40) + "..." : q);
   testQuestion.value = "";
   testNote.value = "";
   loadTests();
@@ -545,6 +603,7 @@ async function runTest(id) {
 
 btnRunAllTests.addEventListener("click", async () => {
   btnRunAllTests.disabled = true;
+  pushActivity("sidebar.actTestRunAll", "");
   try {
     await fetch("/api/tests/run-all", { method: "POST" });
     loadTests();
@@ -606,11 +665,13 @@ langSelect.addEventListener("change", () => {
   settings.lang = langSelect.value;
   applyI18n(settings.lang);
   renderSuggestions();
+  renderActivity();
   if (allDocuments.length || docList.children.length) {
     renderDocStats();
     renderDocList();
   }
   if (lastStatus) renderBackendDetails(lastStatus);
+  loadTests();
   saveSettings(settings);
 });
 
@@ -633,6 +694,8 @@ async function loadStatus() {
     const data = await res.json();
     lastStatus = data;
     sidebarStatus.textContent = `${data.documents} docs - ${data.chunks} chunks`;
+    ovDocs.textContent = data.documents;
+    ovChunks.textContent = data.chunks;
     renderBackendDetails(data);
   } catch (err) {
     sidebarStatus.textContent = "offline";
@@ -645,4 +708,6 @@ applyTheme(settings.theme);
 initSettingsUI();
 applyI18n(settings.lang);
 renderSuggestions();
+renderActivity();
 loadStatus();
+loadTests();
