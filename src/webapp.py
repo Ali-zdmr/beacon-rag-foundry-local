@@ -1,23 +1,25 @@
 """Flask web UI for the local RAG assistant.
 
-Five views in one page: Chat (ask questions, see cited/retrieved passages),
-Documents (see what's indexed, upload/drag-drop new .md/.txt files, delete,
-reindex, preview a document's chunks), Tests (the assignment's Phase 3 test
-set: add questions, run them against the live pipeline, mark pass/fail),
-Settings (top-k, whether to show retrieved passages, theme, language, active
-model info), and About (a short pipeline explainer for presentations).
-Everything here is a thin wrapper around the same src.* pipeline used by the
-CLI - no logic lives only in the web layer.
+Five views in one page: Chat (ask questions, optionally scoped to one
+collection, see cited/retrieved passages), Documents (see what's indexed
+grouped by collection, upload/drag-drop new .md/.txt files into a chosen
+collection, delete, reindex, preview a document's chunks), Tests (the
+assignment's Phase 3 test set: add questions, run them against the live
+pipeline, mark pass/fail), Settings (top-k, whether to show retrieved
+passages, theme, language, active model info), and About (a short pipeline
+explainer for presentations). Everything here is a thin wrapper around the
+same src.* pipeline used by the CLI - no logic lives only in the web layer.
 
 Usage:
     python -m src.webapp
 """
 
+import re
+import shutil
 import time
 from pathlib import Path
 
 from flask import Flask, jsonify, request, render_template
-from werkzeug.utils import secure_filename
 
 from . import config, db, testsuite
 from .embeddings import get_embedding_backend
@@ -34,8 +36,26 @@ app = Flask(
 
 ALLOWED_EXTENSIONS = {".md", ".txt"}
 
+# Strips path separators and other characters illegal in Windows/Unix paths,
+# while preserving non-ASCII letters (unlike werkzeug's secure_filename,
+# which strips them) - filenames and collection names may be in any language.
+_UNSAFE_PATH_CHARS = re.compile(r'[\\/:*?"<>|\x00-\x1f]')
+
 _embedder = None
 _llm = None
+
+
+def _safe_component(name: str) -> str:
+    name = (name or "").strip()
+    name = name.replace("..", "")
+    name = _UNSAFE_PATH_CHARS.sub("_", name)
+    return name.strip(". ")
+
+
+def _collection_dir(collection: str) -> Path:
+    if collection == config.DEFAULT_COLLECTION:
+        return config.DOCS_DIR
+    return config.DOCS_DIR / collection
 
 
 def _backends():
@@ -78,8 +98,37 @@ def status():
             "embedding_alias": config.EMBEDDING_MODEL_ALIAS,
             "chunk_max_chars": config.CHUNK_MAX_CHARS,
             "chunk_overlap_chars": config.CHUNK_OVERLAP_CHARS,
+            "default_collection": config.DEFAULT_COLLECTION,
         }
     )
+
+
+@app.get("/api/collections")
+def list_collections():
+    db_path = Path(config.DB_PATH)
+    collections = []
+    if db_path.exists():
+        with db.connect(db_path) as conn:
+            collections = [dict(row) for row in db.list_collections(conn)]
+    return jsonify({"collections": collections})
+
+
+@app.delete("/api/collections/<collection>")
+def delete_collection(collection):
+    safe_collection = _safe_component(collection)
+    if safe_collection == config.DEFAULT_COLLECTION:
+        return jsonify({"error": "delete files individually from the default collection"}), 400
+
+    target_dir = _collection_dir(safe_collection)
+    if not target_dir.exists():
+        return jsonify({"error": "collection not found"}), 404
+    shutil.rmtree(target_dir)
+
+    try:
+        _reindex()
+    except SystemExit:
+        db.init_db(Path(config.DB_PATH), reset=True)
+    return jsonify({"ok": True})
 
 
 @app.get("/api/documents")
@@ -92,14 +141,15 @@ def list_documents():
     return jsonify({"documents": documents})
 
 
-@app.get("/api/documents/<path:filename>/chunks")
-def document_chunks(filename):
-    safe_name = secure_filename(filename)
+@app.get("/api/documents/<collection>/<path:filename>/chunks")
+def document_chunks(collection, filename):
+    safe_collection = _safe_component(collection)
+    safe_name = _safe_component(filename)
     db_path = Path(config.DB_PATH)
     if not db_path.exists():
         return jsonify({"chunks": []})
     with db.connect(db_path) as conn:
-        rows = db.fetch_chunks_for_document(conn, safe_name)
+        rows = db.fetch_chunks_for_document(conn, safe_collection, safe_name)
     return jsonify(
         {"chunks": [{"index": r["chunk_index"], "text": r["text"]} for r in rows]}
     )
@@ -111,14 +161,17 @@ def upload_document():
     if not files:
         return jsonify({"error": "no file provided"}), 400
 
-    config.DOCS_DIR.mkdir(parents=True, exist_ok=True)
+    collection = _safe_component(request.form.get("collection", "")) or config.DEFAULT_COLLECTION
+    target_dir = _collection_dir(collection)
+    target_dir.mkdir(parents=True, exist_ok=True)
+
     saved, skipped = [], []
     for file in files:
-        filename = secure_filename(file.filename or "")
+        filename = _safe_component(file.filename or "")
         if not filename or Path(filename).suffix.lower() not in ALLOWED_EXTENSIONS:
             skipped.append(file.filename or "?")
             continue
-        file.save(config.DOCS_DIR / filename)
+        file.save(target_dir / filename)
         saved.append(filename)
 
     if saved:
@@ -126,16 +179,21 @@ def upload_document():
             _reindex()
         except SystemExit as exc:
             return jsonify({"error": str(exc)}), 500
-    return jsonify({"ok": True, "saved": saved, "skipped": skipped})
+    return jsonify({"ok": True, "saved": saved, "skipped": skipped, "collection": collection})
 
 
-@app.delete("/api/documents/<path:filename>")
-def delete_document(filename):
-    safe_name = secure_filename(filename)
-    target = config.DOCS_DIR / safe_name
+@app.delete("/api/documents/<collection>/<path:filename>")
+def delete_document(collection, filename):
+    safe_collection = _safe_component(collection)
+    safe_name = _safe_component(filename)
+    target_dir = _collection_dir(safe_collection)
+    target = target_dir / safe_name
     if not target.exists():
         return jsonify({"error": "document not found"}), 404
     target.unlink()
+
+    if target_dir != config.DOCS_DIR and not any(target_dir.iterdir()):
+        target_dir.rmdir()
 
     try:
         _reindex()
@@ -166,11 +224,14 @@ def ask():
     except (TypeError, ValueError):
         top_k = config.TOP_K
     top_k = max(1, min(top_k, 10))
+    collection = (payload.get("collection") or "").strip() or None
 
     embedder, llm = _backends()
     started = time.perf_counter()
     try:
-        result = answer_question(question, k=top_k, embedder=embedder, llm=llm)
+        result = answer_question(
+            question, k=top_k, embedder=embedder, llm=llm, collection=collection
+        )
     except EmbeddingBackendMismatch as exc:
         return jsonify({"error": str(exc)}), 409
     result["elapsed_ms"] = round((time.perf_counter() - started) * 1000)

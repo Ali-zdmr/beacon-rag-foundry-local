@@ -68,6 +68,13 @@
           </div>
         </header>
 
+        <div class="scope-row">
+          <label for="chat-collection" data-i18n="chat.scopeLabel">Ask about:</label>
+          <select id="chat-collection">
+            <option value="" data-i18n="chat.scopeAll">All collections</option>
+          </select>
+        </div>
+
         <div id="suggestions" class="suggestions"></div>
 
         <div id="log" class="log">
@@ -94,6 +101,12 @@
 
         <div id="doc-stats" class="doc-stats"></div>
 
+        <div class="collection-picker">
+          <label for="upload-collection" data-i18n="docs.collectionLabel">Add to collection:</label>
+          <input id="upload-collection" type="text" list="collection-options" data-i18n-placeholder="docs.collectionPlaceholder" placeholder="e.g. Cars, Course Notes... (leave blank for General)" />
+          <datalist id="collection-options"></datalist>
+        </div>
+
         <div id="dropzone" class="dropzone">
           <div class="dropzone-icon">&#128193;</div>
           <div data-i18n="docs.dropzone">Drag files here, or click to browse</div>
@@ -105,7 +118,7 @@
 
         <input id="doc-search" type="text" class="doc-search" data-i18n-placeholder="docs.search" placeholder="Filter documents..." />
 
-        <ul id="doc-list" class="doc-list"></ul>
+        <div id="doc-list" class="doc-list"></div>
       </section>
 
       <!-- SETTINGS VIEW -->

@@ -14,11 +14,12 @@ def answer_question(
     k: int = config.TOP_K,
     embedder=None,
     llm=None,
+    collection: str | None = None,
 ) -> dict:
     embedder = embedder or get_embedding_backend()
     llm = llm or get_llm_backend()
 
-    chunks = get_top_chunks(question, db_path=db_path, k=k, embedder=embedder)
+    chunks = get_top_chunks(question, db_path=db_path, k=k, embedder=embedder, collection=collection)
     answer = llm.answer(question, chunks)
     return {
         "answer": answer,

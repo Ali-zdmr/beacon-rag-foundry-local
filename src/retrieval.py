@@ -30,6 +30,7 @@ def get_top_chunks(
     db_path: Path = config.DB_PATH,
     k: int = config.TOP_K,
     embedder: EmbeddingBackend | None = None,
+    collection: str | None = None,
 ) -> list[dict]:
     embedder = embedder or get_embedding_backend()
 
@@ -42,7 +43,7 @@ def get_top_chunks(
                 "python -m src.ingest"
             )
 
-        rows = db.fetch_all_chunks(conn)
+        rows = db.fetch_all_chunks(conn, collection=collection)
         if not rows:
             return []
 

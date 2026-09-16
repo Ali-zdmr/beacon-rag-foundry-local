@@ -8,6 +8,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DOCS_DIR = Path(os.environ.get("BEACON_DOCS_DIR", BASE_DIR / "data" / "documents"))
 DB_PATH = Path(os.environ.get("BEACON_DB_PATH", BASE_DIR / "data" / "knowledge.db"))
 
+# Files placed directly in DOCS_DIR belong to this collection. A subfolder of
+# DOCS_DIR named e.g. "Cars" becomes its own collection, letting a question
+# be scoped to just that subset of the knowledge base.
+DEFAULT_COLLECTION = "General"
+
 # Foundry Local model aliases (see: foundry model list).
 # Override with env vars if your local catalog uses different aliases.
 LLM_MODEL_ALIAS = os.environ.get("BEACON_LLM_ALIAS", "phi-3.5-mini")

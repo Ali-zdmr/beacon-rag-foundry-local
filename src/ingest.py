@@ -1,5 +1,9 @@
 """Ingestion pipeline: read documents -> chunk -> embed -> store in SQLite.
 
+Files directly in docs_dir belong to config.DEFAULT_COLLECTION. A subfolder
+of docs_dir (one level deep) becomes its own collection named after the
+folder - e.g. data/documents/Cars/*.md is the "Cars" collection.
+
 Usage:
     python -m src.ingest [--docs-dir data/documents] [--db data/knowledge.db] [--reset]
 """
@@ -14,12 +18,17 @@ from .embeddings import EmbeddingBackend, get_embedding_backend
 SUPPORTED_EXTENSIONS = {".md", ".txt"}
 
 
-def load_documents(docs_dir: Path) -> list[tuple[str, str]]:
-    """Return a list of (filename, text) for every supported file in docs_dir."""
+def load_documents(docs_dir: Path) -> list[tuple[str, str, str]]:
+    """Return a list of (collection, filename, text) for every supported file."""
     docs = []
     for path in sorted(docs_dir.iterdir()):
-        if path.suffix.lower() in SUPPORTED_EXTENSIONS:
-            docs.append((path.name, path.read_text(encoding="utf-8")))
+        if path.is_file() and path.suffix.lower() in SUPPORTED_EXTENSIONS:
+            docs.append((config.DEFAULT_COLLECTION, path.name, path.read_text(encoding="utf-8")))
+        elif path.is_dir():
+            collection = path.name
+            for sub in sorted(path.iterdir()):
+                if sub.is_file() and sub.suffix.lower() in SUPPORTED_EXTENSIONS:
+                    docs.append((collection, sub.name, sub.read_text(encoding="utf-8")))
     return docs
 
 
@@ -50,19 +59,19 @@ def run(
     total_chunks = 0
     with db.connect(db_path) as conn:
         db.set_meta(conn, "embedding_backend", embedder.name)
-        for filename, text in documents:
+        for collection, filename, text in documents:
             title = title_from_text(filename, text)
             chunks = split_into_chunks(
                 text, max_chars=config.CHUNK_MAX_CHARS, overlap=config.CHUNK_OVERLAP_CHARS
             )
             if not chunks:
                 continue
-            doc_id = db.insert_document(conn, filename, title)
+            doc_id = db.insert_document(conn, filename, title, collection)
             vectors = embedder.embed(chunks)
             for idx, (chunk_text, vector) in enumerate(zip(chunks, vectors)):
                 db.insert_chunk(conn, doc_id, idx, chunk_text, vector)
             total_chunks += len(chunks)
-            print(f"  ingested {filename!r} -> {len(chunks)} chunk(s)")
+            print(f"  ingested [{collection}] {filename!r} -> {len(chunks)} chunk(s)")
 
     print(
         f"Done. {len(documents)} document(s), {total_chunks} chunk(s) stored in {db_path} "

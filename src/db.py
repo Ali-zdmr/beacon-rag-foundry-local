@@ -1,4 +1,9 @@
-"""SQLite storage for documents, chunks and their embeddings."""
+"""SQLite storage for documents, chunks and their embeddings.
+
+Documents belong to a "collection" - a free-text label (e.g. "Cars",
+"Course Notes") that lets a question be scoped to a subset of the
+knowledge base instead of always searching everything at once.
+"""
 
 import json
 import sqlite3
@@ -14,7 +19,8 @@ CREATE TABLE IF NOT EXISTS meta (
 CREATE TABLE IF NOT EXISTS documents (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     filename TEXT NOT NULL,
-    title TEXT NOT NULL
+    title TEXT NOT NULL,
+    collection TEXT NOT NULL DEFAULT 'General'
 );
 
 CREATE TABLE IF NOT EXISTS chunks (
@@ -59,9 +65,10 @@ def get_meta(conn: sqlite3.Connection, key: str, default: str | None = None) -> 
     return row["value"] if row else default
 
 
-def insert_document(conn: sqlite3.Connection, filename: str, title: str) -> int:
+def insert_document(conn: sqlite3.Connection, filename: str, title: str, collection: str) -> int:
     cur = conn.execute(
-        "INSERT INTO documents(filename, title) VALUES (?, ?)", (filename, title)
+        "INSERT INTO documents(filename, title, collection) VALUES (?, ?, ?)",
+        (filename, title, collection),
     )
     return cur.lastrowid
 
@@ -75,7 +82,16 @@ def insert_chunk(
     )
 
 
-def fetch_all_chunks(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+def fetch_all_chunks(conn: sqlite3.Connection, collection: str | None = None) -> list[sqlite3.Row]:
+    if collection and collection.lower() != "all":
+        return conn.execute(
+            """
+            SELECT chunks.id, chunks.text, chunks.embedding, documents.title AS source
+            FROM chunks JOIN documents ON chunks.doc_id = documents.id
+            WHERE documents.collection = ?
+            """,
+            (collection,),
+        ).fetchall()
     return conn.execute(
         """
         SELECT chunks.id, chunks.text, chunks.embedding, documents.title AS source
@@ -92,24 +108,40 @@ def count_documents(conn: sqlite3.Connection) -> int:
     return conn.execute("SELECT COUNT(*) AS c FROM documents").fetchone()["c"]
 
 
-def fetch_chunks_for_document(conn: sqlite3.Connection, filename: str) -> list[sqlite3.Row]:
+def fetch_chunks_for_document(
+    conn: sqlite3.Connection, collection: str, filename: str
+) -> list[sqlite3.Row]:
     return conn.execute(
         """
         SELECT chunks.chunk_index, chunks.text
         FROM chunks JOIN documents ON chunks.doc_id = documents.id
-        WHERE documents.filename = ?
+        WHERE documents.collection = ? AND documents.filename = ?
         ORDER BY chunks.chunk_index
         """,
-        (filename,),
+        (collection, filename),
     ).fetchall()
 
 
 def list_documents_with_counts(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     return conn.execute(
         """
-        SELECT documents.filename, documents.title, COUNT(chunks.id) AS chunk_count
+        SELECT documents.filename, documents.title, documents.collection,
+               COUNT(chunks.id) AS chunk_count
         FROM documents LEFT JOIN chunks ON chunks.doc_id = documents.id
         GROUP BY documents.id
-        ORDER BY documents.filename
+        ORDER BY documents.collection, documents.filename
+        """
+    ).fetchall()
+
+
+def list_collections(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+    return conn.execute(
+        """
+        SELECT documents.collection AS name,
+               COUNT(DISTINCT documents.id) AS doc_count,
+               COUNT(chunks.id) AS chunk_count
+        FROM documents LEFT JOIN chunks ON chunks.doc_id = documents.id
+        GROUP BY documents.collection
+        ORDER BY documents.collection
         """
     ).fetchall()

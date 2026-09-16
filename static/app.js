@@ -9,6 +9,7 @@ function loadSettings() {
     topK: 3,
     showSources: true,
     confidenceThreshold: 0.15,
+    collection: "",
   };
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
@@ -84,7 +85,10 @@ const docSearch = document.getElementById("doc-search");
 const docList = document.getElementById("doc-list");
 const dropzone = document.getElementById("dropzone");
 const uploadInput = document.getElementById("upload-input");
+const uploadCollectionInput = document.getElementById("upload-collection");
+const collectionOptionsList = document.getElementById("collection-options");
 const btnReindex = document.getElementById("btn-reindex");
+const chatCollectionSelect = document.getElementById("chat-collection");
 
 const testsSummary = document.getElementById("tests-summary");
 const testForm = document.getElementById("test-form");
@@ -111,7 +115,10 @@ navItems.forEach((btn) => {
     views.forEach((v) => v.classList.remove("active"));
     btn.classList.add("active");
     document.getElementById(`view-${btn.dataset.view}`).classList.add("active");
-    if (btn.dataset.view === "docs") loadDocuments();
+    if (btn.dataset.view === "docs") {
+      loadDocuments();
+      loadCollections();
+    }
     if (btn.dataset.view === "settings") loadStatus();
     if (btn.dataset.view === "tests") loadTests();
   });
@@ -240,7 +247,7 @@ async function ask(text) {
     const res = await fetch("/api/ask", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question: text, top_k: settings.topK }),
+      body: JSON.stringify({ question: text, top_k: settings.topK, collection: settings.collection }),
     });
     const data = await res.json();
     typingEl.remove();
@@ -315,6 +322,58 @@ function renderSuggestions() {
   });
 }
 
+// ---- collections --------------------------------------------------------
+
+let DEFAULT_COLLECTION_NAME = "General";
+let allCollections = [];
+
+function collectionLabel(name) {
+  return name === DEFAULT_COLLECTION_NAME ? t(settings.lang, "docs.generalCollection") : name;
+}
+
+async function loadCollections() {
+  try {
+    const res = await fetch("/api/collections");
+    const data = await res.json();
+    allCollections = data.collections || [];
+
+    const previousChatValue = chatCollectionSelect.value;
+    chatCollectionSelect.innerHTML = `<option value="">${t(settings.lang, "chat.scopeAll")}</option>`;
+    allCollections.forEach((c) => {
+      const opt = document.createElement("option");
+      opt.value = c.name;
+      opt.textContent = `${collectionLabel(c.name)} (${c.doc_count})`;
+      chatCollectionSelect.appendChild(opt);
+    });
+    chatCollectionSelect.value = previousChatValue || settings.collection || "";
+
+    collectionOptionsList.innerHTML = "";
+    allCollections
+      .filter((c) => c.name !== DEFAULT_COLLECTION_NAME)
+      .forEach((c) => {
+        const opt = document.createElement("option");
+        opt.value = c.name;
+        collectionOptionsList.appendChild(opt);
+      });
+  } catch (err) {
+    /* collections are a progressive enhancement - fine to skip on failure */
+  }
+}
+
+chatCollectionSelect.addEventListener("change", () => {
+  settings.collection = chatCollectionSelect.value;
+  saveSettings(settings);
+});
+
+async function deleteCollection(name) {
+  if (!window.confirm(`${t(settings.lang, "docs.deleteCollectionConfirm")} "${name}"?`)) return;
+  await fetch(`/api/collections/${encodeURIComponent(name)}`, { method: "DELETE" });
+  pushActivity("sidebar.actDeleted", name);
+  loadDocuments();
+  loadStatus();
+  loadCollections();
+}
+
 // ---- documents --------------------------------------------------------
 
 let allDocuments = [];
@@ -330,6 +389,72 @@ function renderDocStats() {
   `;
 }
 
+function buildDocRow(doc) {
+  const row = document.createElement("div");
+  row.className = "doc-row";
+
+  const main = document.createElement("div");
+  main.className = "doc-row-main";
+
+  const info = document.createElement("div");
+  info.className = "doc-info";
+  info.innerHTML =
+    `<div class="doc-title">${doc.title}</div>` +
+    `<div class="doc-meta">${doc.filename} - ${doc.chunk_count} ${t(settings.lang, "docs.chunks")}</div>`;
+
+  const actions = document.createElement("div");
+  actions.className = "doc-row-actions";
+
+  const previewBtn = document.createElement("button");
+  previewBtn.className = "ghost-btn";
+  previewBtn.textContent = t(settings.lang, "docs.preview");
+
+  const del = document.createElement("button");
+  del.className = "doc-delete";
+  del.textContent = t(settings.lang, "docs.delete");
+  del.addEventListener("click", (e) => {
+    e.stopPropagation();
+    deleteDocument(doc.collection, doc.filename);
+  });
+
+  actions.appendChild(previewBtn);
+  actions.appendChild(del);
+  main.appendChild(info);
+  main.appendChild(actions);
+  row.appendChild(main);
+
+  const previewWrap = document.createElement("div");
+  previewWrap.style.display = "none";
+  row.appendChild(previewWrap);
+
+  previewBtn.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    const isOpen = previewWrap.style.display !== "none";
+    if (isOpen) {
+      previewWrap.style.display = "none";
+      return;
+    }
+    if (!previewWrap.dataset.loaded) {
+      const url = `/api/documents/${encodeURIComponent(doc.collection)}/${encodeURIComponent(doc.filename)}/chunks`;
+      const res = await fetch(url);
+      const data = await res.json();
+      previewWrap.className = "doc-preview";
+      previewWrap.innerHTML = "";
+      (data.chunks || []).forEach((c) => {
+        const chunkEl = document.createElement("div");
+        chunkEl.className = "doc-chunk";
+        const preview = c.text.length > 200 ? c.text.slice(0, 200) + "..." : c.text;
+        chunkEl.innerHTML = `<span class="chunk-index">#${c.index}</span>${preview}`;
+        previewWrap.appendChild(chunkEl);
+      });
+      previewWrap.dataset.loaded = "1";
+    }
+    previewWrap.style.display = "flex";
+  });
+
+  return row;
+}
+
 function renderDocList() {
   const filter = (docSearch.value || "").toLowerCase();
   const filtered = allDocuments.filter(
@@ -338,77 +463,50 @@ function renderDocList() {
 
   docList.innerHTML = "";
   if (!allDocuments.length) {
-    docList.innerHTML = `<li class="hint">${t(settings.lang, "docs.empty")}</li>`;
+    docList.innerHTML = `<div class="hint">${t(settings.lang, "docs.empty")}</div>`;
     return;
   }
   if (!filtered.length) {
-    docList.innerHTML = `<li class="hint">${t(settings.lang, "docs.noMatch")}</li>`;
+    docList.innerHTML = `<div class="hint">${t(settings.lang, "docs.noMatch")}</div>`;
     return;
   }
 
+  const groups = {};
   filtered.forEach((doc) => {
-    const li = document.createElement("li");
-    li.className = "doc-row";
+    (groups[doc.collection] = groups[doc.collection] || []).push(doc);
+  });
 
-    const main = document.createElement("div");
-    main.className = "doc-row-main";
+  const names = Object.keys(groups).sort((a, b) => {
+    if (a === DEFAULT_COLLECTION_NAME) return -1;
+    if (b === DEFAULT_COLLECTION_NAME) return 1;
+    return a.localeCompare(b);
+  });
 
-    const info = document.createElement("div");
-    info.className = "doc-info";
-    info.innerHTML =
-      `<div class="doc-title">${doc.title}</div>` +
-      `<div class="doc-meta">${doc.filename} - ${doc.chunk_count} ${t(settings.lang, "docs.chunks")}</div>`;
+  names.forEach((name) => {
+    const docs = groups[name];
+    const chunkCount = docs.reduce((sum, d) => sum + d.chunk_count, 0);
 
-    const actions = document.createElement("div");
-    actions.className = "doc-row-actions";
+    const group = document.createElement("div");
+    group.className = "collection-group";
 
-    const previewBtn = document.createElement("button");
-    previewBtn.className = "ghost-btn";
-    previewBtn.textContent = t(settings.lang, "docs.preview");
+    const header = document.createElement("div");
+    header.className = "collection-header";
+    const headerLeft = document.createElement("span");
+    headerLeft.innerHTML =
+      `<span class="collection-name">${collectionLabel(name)}</span> - ${docs.length} ${t(settings.lang, "docs.statsTotal")}, ${chunkCount} ${t(settings.lang, "docs.chunks")}`;
+    header.appendChild(headerLeft);
 
-    const del = document.createElement("button");
-    del.className = "doc-delete";
-    del.textContent = t(settings.lang, "docs.delete");
-    del.addEventListener("click", (e) => {
-      e.stopPropagation();
-      deleteDocument(doc.filename);
-    });
+    if (name !== DEFAULT_COLLECTION_NAME) {
+      const delCollectionBtn = document.createElement("button");
+      delCollectionBtn.className = "ghost-btn small";
+      delCollectionBtn.textContent = t(settings.lang, "docs.deleteCollection");
+      delCollectionBtn.addEventListener("click", () => deleteCollection(name));
+      header.appendChild(delCollectionBtn);
+    }
 
-    actions.appendChild(previewBtn);
-    actions.appendChild(del);
-    main.appendChild(info);
-    main.appendChild(actions);
-    li.appendChild(main);
-
-    const previewWrap = document.createElement("div");
-    previewWrap.style.display = "none";
-    li.appendChild(previewWrap);
-
-    previewBtn.addEventListener("click", async (e) => {
-      e.stopPropagation();
-      const isOpen = previewWrap.style.display !== "none";
-      if (isOpen) {
-        previewWrap.style.display = "none";
-        return;
-      }
-      if (!previewWrap.dataset.loaded) {
-        const res = await fetch(`/api/documents/${encodeURIComponent(doc.filename)}/chunks`);
-        const data = await res.json();
-        previewWrap.className = "doc-preview";
-        previewWrap.innerHTML = "";
-        (data.chunks || []).forEach((c) => {
-          const chunkEl = document.createElement("div");
-          chunkEl.className = "doc-chunk";
-          const preview = c.text.length > 200 ? c.text.slice(0, 200) + "..." : c.text;
-          chunkEl.innerHTML = `<span class="chunk-index">#${c.index}</span>${preview}`;
-          previewWrap.appendChild(chunkEl);
-        });
-        previewWrap.dataset.loaded = "1";
-      }
-      previewWrap.style.display = "flex";
-    });
-
-    docList.appendChild(li);
+    group.appendChild(header);
+    docs.forEach((doc) => group.appendChild(buildDocRow(doc)));
+    docList.appendChild(group);
   });
 }
 
@@ -420,17 +518,20 @@ async function loadDocuments() {
     renderDocStats();
     renderDocList();
   } catch (err) {
-    docList.innerHTML = `<li class="hint">${t(settings.lang, "chat.noServer")}</li>`;
+    docList.innerHTML = `<div class="hint">${t(settings.lang, "chat.noServer")}</div>`;
   }
 }
 
 docSearch.addEventListener("input", renderDocList);
 
-async function deleteDocument(filename) {
-  await fetch(`/api/documents/${encodeURIComponent(filename)}`, { method: "DELETE" });
+async function deleteDocument(collection, filename) {
+  await fetch(`/api/documents/${encodeURIComponent(collection)}/${encodeURIComponent(filename)}`, {
+    method: "DELETE",
+  });
   pushActivity("sidebar.actDeleted", filename);
   loadDocuments();
   loadStatus();
+  loadCollections();
 }
 
 async function uploadFiles(fileList) {
@@ -438,11 +539,15 @@ async function uploadFiles(fileList) {
   if (!files.length) return;
   const formData = new FormData();
   files.forEach((f) => formData.append("files", f));
-  await fetch("/api/documents", { method: "POST", body: formData });
+  const collectionValue = uploadCollectionInput.value.trim();
+  if (collectionValue) formData.append("collection", collectionValue);
+  const res = await fetch("/api/documents", { method: "POST", body: formData });
+  const data = await res.json();
   const label = files.length === 1 ? files[0].name : `${files.length} files`;
-  pushActivity("sidebar.actUploaded", label);
+  pushActivity("sidebar.actUploaded", data.collection ? `${label} -> ${collectionLabel(data.collection)}` : label);
   loadDocuments();
   loadStatus();
+  loadCollections();
 }
 
 dropzone.addEventListener("click", () => uploadInput.click());
@@ -471,6 +576,7 @@ btnReindex.addEventListener("click", async () => {
   pushActivity("sidebar.actReindexed", "");
   loadDocuments();
   loadStatus();
+  loadCollections();
 });
 
 // ---- tests --------------------------------------------------------------
@@ -672,6 +778,7 @@ langSelect.addEventListener("change", () => {
   }
   if (lastStatus) renderBackendDetails(lastStatus);
   loadTests();
+  loadCollections();
   saveSettings(settings);
 });
 
@@ -693,6 +800,7 @@ async function loadStatus() {
     const res = await fetch("/api/status");
     const data = await res.json();
     lastStatus = data;
+    if (data.default_collection) DEFAULT_COLLECTION_NAME = data.default_collection;
     sidebarStatus.textContent = `${data.documents} docs - ${data.chunks} chunks`;
     ovDocs.textContent = data.documents;
     ovChunks.textContent = data.chunks;
@@ -710,4 +818,5 @@ applyI18n(settings.lang);
 renderSuggestions();
 renderActivity();
 loadStatus();
+loadCollections();
 loadTests();
