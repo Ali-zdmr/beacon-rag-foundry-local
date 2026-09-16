@@ -34,21 +34,12 @@ class FoundryLocalLLM(LLMBackend):
     name = "foundry-local"
 
     def __init__(self, alias: str = config.LLM_MODEL_ALIAS):
-        from foundry_local import FoundryLocalManager
-        import openai
+        from .foundry_runtime import get_ready_model
 
-        self._manager = FoundryLocalManager(alias)
-        model_info = self._manager.get_model_info(alias)
-        self._model_id = model_info.id
-        self._client = openai.OpenAI(
-            base_url=self._manager.endpoint, api_key=self._manager.api_key or "not-needed"
-        )
-        # Fail fast if the service isn't actually reachable.
-        self._client.chat.completions.create(
-            model=self._model_id,
-            messages=[{"role": "user", "content": "ping"}],
-            max_tokens=1,
-        )
+        model = get_ready_model(alias)
+        self._client = model.get_chat_client()
+        # Fail fast if inference doesn't actually work.
+        self._client.complete_chat([{"role": "user", "content": "ping"}])
 
     def answer(self, question: str, context_chunks: list[dict]) -> str:
         if not context_chunks:
@@ -57,9 +48,7 @@ class FoundryLocalLLM(LLMBackend):
             {"role": "system", "content": config.SYSTEM_PROMPT},
             {"role": "user", "content": _build_prompt(question, context_chunks)},
         ]
-        response = self._client.chat.completions.create(
-            model=self._model_id, messages=messages, temperature=0.2
-        )
+        response = self._client.complete_chat(messages)
         return response.choices[0].message.content.strip()
 
 

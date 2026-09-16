@@ -1,9 +1,9 @@
 """Embedding backends.
 
-FoundryLocalEmbeddings talks to a real Microsoft Foundry Local runtime, exactly
-as described in the "Building Your First Local RAG Application with Foundry
-Local" tutorial: Foundry Local exposes an OpenAI-compatible endpoint on
-localhost, so we reuse the `openai` client pointed at it.
+FoundryLocalEmbeddings talks to a real, locally installed Microsoft Foundry
+Local runtime: it looks up the model by alias, downloads/loads it if needed,
+and uses the SDK's OpenAI-compatible embedding client - verified end-to-end
+against foundry-local-sdk 2.0.1 and a real qwen3-embedding-0.6b model.
 
 HashingEmbeddings is a pure-Python/numpy fallback with no external
 dependencies or downloads, so the whole pipeline still runs end-to-end (fully
@@ -34,20 +34,15 @@ class FoundryLocalEmbeddings(EmbeddingBackend):
     name = "foundry-local"
 
     def __init__(self, alias: str = config.EMBEDDING_MODEL_ALIAS):
-        from foundry_local import FoundryLocalManager  # noqa: F401  (import validates install)
-        import openai
+        from .foundry_runtime import get_ready_model
 
-        self._manager = FoundryLocalManager(alias)
-        model_info = self._manager.get_model_info(alias)
-        self._model_id = model_info.id
-        self._client = openai.OpenAI(
-            base_url=self._manager.endpoint, api_key=self._manager.api_key or "not-needed"
-        )
-        # Fail fast if the service isn't actually reachable.
-        self._client.embeddings.create(model=self._model_id, input=["healthcheck"])
+        model = get_ready_model(alias)
+        self._client = model.get_embedding_client()
+        # Fail fast if inference doesn't actually work.
+        self._client.generate_embeddings(["healthcheck"])
 
     def embed(self, texts: list[str]) -> list[list[float]]:
-        response = self._client.embeddings.create(model=self._model_id, input=texts)
+        response = self._client.generate_embeddings(texts)
         return [item.embedding for item in response.data]
 
 

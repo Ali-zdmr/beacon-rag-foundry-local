@@ -1,8 +1,16 @@
 numpy
 flask
 
+# Optional: extracts text from PDF/Word uploads. The app still works with
+# only .md/.txt files if these aren't installed.
+pypdf
+python-docx
+
 # Optional: enables real on-device inference via Microsoft Foundry Local.
-# The app works without these two (falls back to an offline hashing embedder
+# The app works without these (falls back to an offline hashing embedder
 # and an extractive responder) but generative answers require them.
-foundry-local-sdk
+# Pinned to >=2.0 - src/foundry_runtime.py targets the Configuration/
+# Catalog/IModel API introduced in foundry-local-sdk 2.x, not the older
+# FoundryLocalManager(alias) shape some tutorials still show.
+foundry-local-sdk>=2.0.0
 openai

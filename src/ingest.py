@@ -14,21 +14,31 @@ from pathlib import Path
 from . import config, db
 from .chunking import split_into_chunks
 from .embeddings import EmbeddingBackend, get_embedding_backend
-
-SUPPORTED_EXTENSIONS = {".md", ".txt"}
+from .extractors import SUPPORTED_EXTENSIONS, extract_text
 
 
 def load_documents(docs_dir: Path) -> list[tuple[str, str, str]]:
-    """Return a list of (collection, filename, text) for every supported file."""
+    """Return a list of (collection, filename, text) for every supported file.
+
+    A file that fails to extract (e.g. a corrupted PDF) is skipped with a
+    warning instead of aborting the whole ingestion run.
+    """
     docs = []
+
+    def _load(path: Path, collection: str) -> None:
+        try:
+            docs.append((collection, path.name, extract_text(path)))
+        except Exception as exc:  # noqa: BLE001 - a bad file shouldn't kill ingestion
+            print(f"  skipping {path.name!r}: could not extract text ({exc})")
+
     for path in sorted(docs_dir.iterdir()):
         if path.is_file() and path.suffix.lower() in SUPPORTED_EXTENSIONS:
-            docs.append((config.DEFAULT_COLLECTION, path.name, path.read_text(encoding="utf-8")))
+            _load(path, config.DEFAULT_COLLECTION)
         elif path.is_dir():
             collection = path.name
             for sub in sorted(path.iterdir()):
                 if sub.is_file() and sub.suffix.lower() in SUPPORTED_EXTENSIONS:
-                    docs.append((collection, sub.name, sub.read_text(encoding="utf-8")))
+                    _load(sub, collection)
     return docs
 
 

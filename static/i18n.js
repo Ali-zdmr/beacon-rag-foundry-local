@@ -46,7 +46,7 @@ const I18N = {
     "docs.upload": "Upload",
     "docs.dropzone": "Drag files here, or click to browse",
     "docs.hint":
-      "Only .md and .txt files are supported. Uploading or deleting a file automatically rebuilds the index.",
+      "Supports .md, .txt, .pdf, and .docx files. Uploading or deleting a file automatically rebuilds the index.",
     "docs.search": "Filter documents...",
     "docs.chunks": "chunks",
     "docs.delete": "Delete",
@@ -158,7 +158,7 @@ const I18N = {
     "docs.upload": "Yükle",
     "docs.dropzone": "Dosyaları buraya sürükle, ya da tıklayıp seç",
     "docs.hint":
-      "Sadece .md ve .txt dosyaları desteklenir. Bir dosya yükleyip silmek indeksi otomatik olarak yeniden oluşturur.",
+      "Şu formatlar desteklenir: .md, .txt, .pdf, .docx. Bir dosya yükleyip silmek indeksi otomatik olarak yeniden oluşturur.",
     "docs.search": "Belgelerde filtrele...",
     "docs.chunks": "parça",
     "docs.delete": "Sil",

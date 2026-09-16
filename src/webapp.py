@@ -2,8 +2,8 @@
 
 Five views in one page: Chat (ask questions, optionally scoped to one
 collection, see cited/retrieved passages), Documents (see what's indexed
-grouped by collection, upload/drag-drop new .md/.txt files into a chosen
-collection, delete, reindex, preview a document's chunks), Tests (the
+grouped by collection, upload/drag-drop new .md/.txt/.pdf/.docx files into a
+chosen collection, delete, reindex, preview a document's chunks), Tests (the
 assignment's Phase 3 test set: add questions, run them against the live
 pipeline, mark pass/fail), Settings (top-k, whether to show retrieved
 passages, theme, language, active model info), and About (a short pipeline
@@ -23,6 +23,7 @@ from flask import Flask, jsonify, request, render_template
 
 from . import config, db, testsuite
 from .embeddings import get_embedding_backend
+from .extractors import SUPPORTED_EXTENSIONS as ALLOWED_EXTENSIONS
 from .ingest import run as ingest_run
 from .llm import get_llm_backend
 from .qa import answer_question
@@ -33,8 +34,6 @@ app = Flask(
     template_folder=str(config.BASE_DIR / "templates"),
     static_folder=str(config.BASE_DIR / "static"),
 )
-
-ALLOWED_EXTENSIONS = {".md", ".txt"}
 
 # Strips path separators and other characters illegal in Windows/Unix paths,
 # while preserving non-ASCII letters (unlike werkzeug's secure_filename,
