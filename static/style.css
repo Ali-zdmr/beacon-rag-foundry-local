@@ -54,7 +54,39 @@ body {
 
 .brand { display: flex; align-items: center; gap: 8px; padding: 4px 8px 20px; }
 .brand h1 { font-size: 16px; margin: 0; font-weight: 600; letter-spacing: 0.2px; }
-.dot { width: 8px; height: 8px; border-radius: 50%; background: #34d399; display: inline-block; flex-shrink: 0; }
+.beacon {
+  position: relative;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffe1a8, #f5a623 60%, #c9760a 100%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 0 6px 1px rgba(245, 166, 35, 0.7);
+  animation: beacon-pulse 2.4s ease-in-out infinite;
+}
+
+.beacon.beacon-sm { width: 8px; height: 8px; box-shadow: 0 0 4px 1px rgba(245, 166, 35, 0.6); }
+
+.beacon-beam {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 1px solid rgba(245, 166, 35, 0.5);
+  animation: beacon-ring 2.4s ease-out infinite;
+}
+
+@keyframes beacon-pulse {
+  0%, 100% { box-shadow: 0 0 6px 1px rgba(245, 166, 35, 0.7); }
+  50% { box-shadow: 0 0 12px 4px rgba(245, 166, 35, 0.9); }
+}
+
+@keyframes beacon-ring {
+  0% { transform: scale(0.6); opacity: 0.8; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
 
 .nav { display: flex; flex-direction: column; gap: 4px; flex: 1; }
 

@@ -1,11 +1,12 @@
-# FoundryQA - Local RAG Document Assistant
+# Beacon - Local RAG Document Assistant
 
 A small, fully offline-capable Q&A assistant built for the Microsoft summer
-program "Building Your First Local RAG Application with Foundry Local". It
-answers questions about a local set of documents by retrieving the most
-relevant passages from a SQLite-backed knowledge base and grounding a local
-language model's answer in them - never in the cloud, never guessing beyond
-what the documents actually say.
+program "Building Your First Local RAG Application with Foundry Local". Like
+a lighthouse beam, it only lights up what's actually there: it answers
+questions about a local set of documents by retrieving the most relevant
+passages from a SQLite-backed knowledge base and grounding a local language
+model's answer in them - never in the cloud, never guessing beyond what the
+documents actually say, never wandering into open water.
 
 This project follows the same architecture as the assignment brief (chunk ->
 embed -> store in SQLite -> retrieve -> generate with Microsoft Foundry

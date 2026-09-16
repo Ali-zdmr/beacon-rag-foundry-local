@@ -3,15 +3,15 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>FoundryQA - Local Document Assistant</title>
+<title>Beacon - Local Document Assistant</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
 </head>
 <body>
   <div class="app">
     <aside class="sidebar">
       <div class="brand">
-        <span class="dot"></span>
-        <h1>FoundryQA</h1>
+        <span class="beacon"><span class="beacon-beam"></span></span>
+        <h1>Beacon</h1>
       </div>
 
       <nav class="nav">
@@ -28,7 +28,8 @@
 
       <div class="sidebar-footer">
         <div class="offline-badge">
-          <span class="dot"></span> <span data-i18n="sidebar.offline">Offline / on-device</span>
+          <span class="beacon beacon-sm"><span class="beacon-beam"></span></span>
+          <span data-i18n="sidebar.offline">Offline / on-device</span>
         </div>
         <div id="sidebar-status" class="sidebar-status">&hellip;</div>
       </div>
