@@ -6,76 +6,35 @@
 ![Offline First](https://img.shields.io/badge/offline--first-yes-34D399)
 ![Verified](https://img.shields.io/badge/Foundry%20Local-verified%20end--to--end-success)
 
-![Beacon chat screenshot - a real question answered by a real Foundry Local model, with source citations, a confidence score, and response time](docs/screenshots/chat.png)
+![Beacon chat screenshot with a generated answer, source citations, a confidence score, and response time](docs/screenshots/chat.png)
 
-A small, offline-capable Q&A assistant built for the Microsoft summer
+## Project
+
+Beacon is an offline-capable Q&A assistant built for the Microsoft summer
 program "Building Your First Local RAG Application with Foundry Local". It
 answers questions about a set of local documents by retrieving the most
 relevant passages from a SQLite-backed knowledge base and grounding a local
 language model's answer in them, instead of answering from memory.
 
 The architecture follows the assignment brief: chunk -> embed -> store in
-SQLite -> retrieve -> generate with Microsoft Foundry Local. It's a
-from-scratch implementation, not a copy of a reference project. A few things
-worth calling out:
+SQLite -> retrieve -> generate with Microsoft Foundry Local.
 
-- It runs against a real, installed Foundry Local, not just code written to
-  match the docs - see "Verified against real Foundry Local" below for the
-  actual commands and output.
-- It also works without Foundry Local installed: both the embedding step
-  and answer generation have an offline fallback (see "How the fallback
-  works"), so the pipeline is testable either way.
-- Every control in the UI does something real - uploading a file rebuilds
-  the index, changing top-k changes how many passages are retrieved, and a
-  test case's pass/fail comes from an actual run, not a hardcoded value.
+## Features
 
-## Verified against real Foundry Local
+- Retrieval-augmented Q&A over your own `.md`/`.txt`/`.pdf`/`.docx` files,
+  with source citations and a similarity-based confidence score.
+- Documents can be grouped into named **collections** (e.g. "Cars", "Course
+  Notes") and a question scoped to just one of them - see below.
+- A **test set** tab for the assignment's Phase 3 evaluation phase: add a
+  question and what you expect, run it against the live pipeline, mark
+  pass/fail.
+- Works with a real, installed Foundry Local for on-device inference, and
+  falls back to an offline hashing embedder + extractive responder when
+  Foundry Local isn't available, so the pipeline runs either way.
+- A small web UI (chat, document manager, tests, settings, pipeline
+  explainer) in Turkish or English, dark or light.
 
-This was actually run, not just written to spec:
-
-```
-$ python -m src.ingest
-[embeddings] Using Foundry Local model 'qwen3-embedding-0.6b'.
-  ingested [Cars] 'combustion_engine_basics.md' -> 2 chunk(s)
-  ingested [Cars] 'electric_vehicles.docx' -> 1 chunk(s)
-  ingested [Cars] 'tire_pressure_basics.pdf' -> 1 chunk(s)
-  ingested [General] 'foundry_local_overview.md' -> 4 chunk(s)
-  ingested [General] 'prompt_engineering_for_qa.md' -> 3 chunk(s)
-  ingested [General] 'rag_overview.md' -> 4 chunk(s)
-  ingested [General] 'sqlite_for_local_storage.md' -> 3 chunk(s)
-Done. 7 document(s), 18 chunk(s) stored (embedding backend: foundry-local).
-```
-
-`get_embedding_backend()` and `get_llm_backend()` pick the real Foundry
-Local backend automatically once it's installed and the models are cached -
-no config flag needed. A real question against the real model, unedited:
-
-```
-$ python -m src.chat_cli --query "What is RAG and why does chunk overlap matter?"
-Ready. embeddings=foundry-local llm=foundry-local
-
-RAG stands for Retrieval-Augmented Generation, a method for building AI
-assistants that answer questions by retrieving relevant passages from a
-specific set of documents, using them as context, and generating an answer
-grounded in that context.
-
-Chunk overlap matters because it ensures that information near a boundary
-is not lost during the process of combining retrieved passages to form a
-coherent context for the AI to generate an answer from.
-
-Source document names:
-1. What is Retrieval-Augmented Generation (RAG)?
-
-Sources: What is Retrieval-Augmented Generation (RAG)?
-```
-
-Note on the SDK: `foundry-local-sdk`'s actual API
-(`Configuration`/`Catalog`/`IModel`, in `src/foundry_runtime.py`) is
-different from the simpler `FoundryLocalManager(alias)` shape shown in some
-older tutorials. The code here matches what the currently installed SDK
-(2.0.1) exposes.
-
-## Project structure
+## Architecture / Structure
 
 ```
 src/
@@ -104,7 +63,7 @@ data/test_cases.json  seeded Phase 3 test set (a few Q&A pairs, incl. one
 tests/test_pipeline.py  end-to-end smoke test
 ```
 
-## How the fallback works
+### How the fallback works
 
 `get_embedding_backend()` and `get_llm_backend()` each try to look up the
 configured model alias in the Foundry Local catalog first
@@ -123,7 +82,54 @@ The database records which embedding backend produced its vectors (`meta`
 table), so switching backends without re-running ingestion gives a clear
 error instead of silently comparing incompatible vectors.
 
-## Setup
+### Verified against Foundry Local
+
+```
+$ python -m src.ingest
+[embeddings] Using Foundry Local model 'qwen3-embedding-0.6b'.
+  ingested [Cars] 'combustion_engine_basics.md' -> 2 chunk(s)
+  ingested [Cars] 'electric_vehicles.docx' -> 1 chunk(s)
+  ingested [Cars] 'tire_pressure_basics.pdf' -> 1 chunk(s)
+  ingested [General] 'foundry_local_overview.md' -> 4 chunk(s)
+  ingested [General] 'prompt_engineering_for_qa.md' -> 3 chunk(s)
+  ingested [General] 'rag_overview.md' -> 4 chunk(s)
+  ingested [General] 'sqlite_for_local_storage.md' -> 3 chunk(s)
+Done. 7 document(s), 18 chunk(s) stored (embedding backend: foundry-local).
+```
+
+```
+$ python -m src.chat_cli --query "What is RAG and why does chunk overlap matter?"
+Ready. embeddings=foundry-local llm=foundry-local
+
+RAG stands for Retrieval-Augmented Generation, a method for building AI
+assistants that answer questions by retrieving relevant passages from a
+specific set of documents, using them as context, and generating an answer
+grounded in that context.
+
+Chunk overlap matters because it ensures that information near a boundary
+is not lost during the process of combining retrieved passages to form a
+coherent context for the AI to generate an answer from.
+
+Source document names:
+1. What is Retrieval-Augmented Generation (RAG)?
+
+Sources: What is Retrieval-Augmented Generation (RAG)?
+```
+
+Note on the SDK: `foundry-local-sdk`'s API
+(`Configuration`/`Catalog`/`IModel`, in `src/foundry_runtime.py`) differs
+from the simpler `FoundryLocalManager(alias)` shape shown in some older
+tutorials. The code here matches what the currently installed SDK (2.0.1)
+exposes.
+
+## Requirements
+
+- Python 3.11+
+- Dependencies in `requirements.txt` (numpy, flask, pypdf, python-docx,
+  foundry-local-sdk)
+- Optional: [Microsoft Foundry Local](https://learn.microsoft.com/azure/foundry-local/) for on-device inference (see below)
+
+## Installation
 
 ```bash
 python -m venv .venv
@@ -131,7 +137,7 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-### Optional: enable real on-device inference with Foundry Local
+### Optional: enable on-device inference with Foundry Local
 
 1. Install Foundry Local (Windows): `winget install Microsoft.FoundryLocal`
 2. Check the catalog of available models: `foundry model list`
@@ -141,21 +147,6 @@ pip install -r requirements.txt
 4. Re-run `python -m src.ingest` so the knowledge base is re-embedded with
    the real model. The first run downloads the model (a few hundred MB to
    a couple GB depending on the alias), so it pauses there the first time.
-
-## Collections
-
-A question doesn't have to search every document you've added. Files
-placed directly in `data/documents/` belong to the `General` collection;
-any subfolder becomes its own named collection - e.g.
-`data/documents/Cars/*.md` is the "Cars" collection. This lets you keep,
-say, course notes separate from a car project's notes, and scope a
-question to just one of them.
-
-In the web UI: type a collection name when uploading/dropping files and
-it's created automatically; the Chat tab has a scope dropdown ("All
-collections" or one specific one); deleting a collection removes its
-folder and reindexes. The default `General` collection can't be
-bulk-deleted this way since it's just `data/documents/` itself.
 
 ## Usage
 
@@ -177,53 +168,58 @@ python -m src.webapp
 # open http://127.0.0.1:5000
 ```
 
-The web UI has five tabs:
+### Collections
 
-### Chat
+A question doesn't have to search every document you've added. Files
+placed directly in `data/documents/` belong to the `General` collection;
+any subfolder becomes its own named collection - e.g.
+`data/documents/Cars/*.md` is the "Cars" collection. This lets you keep,
+say, course notes separate from a car project's notes, and scope a
+question to just one of them.
 
-![Chat tab with the scope dropdown, suggestion chips, and a real generated answer](docs/screenshots/chat.png)
+In the web UI: type a collection name when uploading/dropping files and
+it's created automatically; the Chat tab has a scope dropdown ("All
+collections" or one specific one); deleting a collection removes its
+folder and reindexes. The default `General` collection can't be
+bulk-deleted this way since it's just `data/documents/` itself.
 
-Scope a question to one collection or all of them, click an example
-question chip, and get an answer with a confidence badge (based on the top
-retrieved passage's similarity score) and expandable source cards
-underneath. Includes response time, a copy button, and exporting the
-conversation as Markdown.
+### Web UI tabs
 
-### Documents
+**Chat** - scope a question to one collection or all of them, click an
+example question chip, get an answer with a confidence badge (based on the
+top retrieved passage's similarity score) and expandable source cards.
+Response time, a copy button, exporting the conversation as Markdown.
 
-![Documents tab showing files grouped by collection (General and Cars), with upload/preview/delete controls](docs/screenshots/documents.png)
+![Chat tab](docs/screenshots/chat.png)
 
-Documents grouped by collection, with a stats bar, a filter box, and a
-drag-and-drop zone for uploading (or click to browse, multiple files at
-once). Preview a document's indexed chunks, delete a file, or force a
+**Documents** - files grouped by collection, a stats bar, a filter box,
+and a drag-and-drop zone for uploading (or click to browse, multiple files
+at once). Preview a document's indexed chunks, delete a file, or force a
 manual reindex.
 
-### Tests
+![Documents tab](docs/screenshots/documents.png)
 
-![Tests tab showing three seeded test cases run against the real model, all marked passed](docs/screenshots/tests.png)
-
-The assignment's Phase 3 test set: add a question plus what you expect
-("should cite doc X", "should say it doesn't know"), run it against the
-live pipeline, and mark the result pass/fail. Seeded with three cases in
-`data/test_cases.json`, including one deliberately out of scope - in the
-screenshot above, the real model correctly refused it ("The provided
+**Tests** - the assignment's Phase 3 test set: add a question plus what
+you expect ("should cite doc X", "should say it doesn't know"), run it
+against the live pipeline, mark the result pass/fail. Seeded with three
+cases in `data/test_cases.json`, including one deliberately out of scope -
+in the screenshot below, the model correctly refused it ("The provided
 context does not contain information about the capital of France")
 instead of guessing.
 
-### Settings
+![Tests tab](docs/screenshots/tests.png)
 
-![Settings tab showing top-k, confidence threshold, theme/language, and the active Foundry Local backends and model aliases](docs/screenshots/settings.png)
+**Settings** - top-k, the low-confidence threshold, whether retrieved
+passages are shown, dark/light theme, Turkish/English, and which
+embedding/LLM backends and model aliases are currently active. Settings
+persist in `localStorage`.
 
-Top-k, the low-confidence threshold, whether retrieved passages are shown,
-dark/light theme, Turkish/English, and which embedding/LLM backends and
-model aliases are currently active. Settings persist in `localStorage`.
+![Settings tab](docs/screenshots/settings.png)
 
-### About
+**About** - a pipeline diagram (chunking -> embedding -> SQLite ->
+retrieval -> generation) for a quick explanation during a presentation.
 
-![About tab showing the five-step pipeline diagram: Chunking, Embedding, SQLite, Retrieval, Generation](docs/screenshots/about.png)
-
-A pipeline diagram (chunking -> embedding -> SQLite -> retrieval ->
-generation) for a quick explanation during a presentation.
+![About tab](docs/screenshots/about.png)
 
 ## Tests
 

@@ -11,7 +11,6 @@ pass/fail/None verdict.
 import json
 import time
 import uuid
-from pathlib import Path
 
 from . import config
 
