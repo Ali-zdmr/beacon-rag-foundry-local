@@ -1,14 +1,7 @@
 """Flask web UI for the local RAG assistant.
 
-Five views in one page: Chat (ask questions, optionally scoped to one
-collection, see cited/retrieved passages), Documents (see what's indexed
-grouped by collection, upload/drag-drop new .md/.txt/.pdf/.docx files into a
-chosen collection, delete, reindex, preview a document's chunks), Tests (the
-assignment's Phase 3 test set: add questions, run them against the live
-pipeline, mark pass/fail), Settings (top-k, whether to show retrieved
-passages, theme, language, active model info), and About (a short pipeline
-explainer for presentations). Everything here is a thin wrapper around the
-same src.* pipeline used by the CLI - no logic lives only in the web layer.
+Five tabs: Chat, Documents, Tests, Settings, About. Each route is a thin
+wrapper around the same src.* pipeline used by the CLI.
 
 Usage:
     python -m src.webapp

@@ -33,7 +33,6 @@ const I18N = {
     "chat.sourcesLabel": "Retrieved passages",
     "chat.noAnswer": "Something went wrong.",
     "chat.noServer": "Could not reach the server.",
-    "chat.thinking": "Thinking...",
     "chat.copy": "Copy",
     "chat.copied": "Copied!",
     "chat.confidenceGood": "good match",
@@ -43,7 +42,6 @@ const I18N = {
     "chat.scopeAll": "All collections",
     "docs.title": "Knowledge base",
     "docs.reindex": "Reindex",
-    "docs.upload": "Upload",
     "docs.dropzone": "Drag files here, or click to browse",
     "docs.hint":
       "Supports .md, .txt, .pdf, and .docx files. Uploading or deleting a file automatically rebuilds the index.",
@@ -145,7 +143,6 @@ const I18N = {
     "chat.sourcesLabel": "Kullanılan pasajlar",
     "chat.noAnswer": "Bir şeyler ters gitti.",
     "chat.noServer": "Sunucuya ulaşılamadı.",
-    "chat.thinking": "Düşünüyor...",
     "chat.copy": "Kopyala",
     "chat.copied": "Kopyalandı!",
     "chat.confidenceGood": "iyi eşleşme",
@@ -155,7 +152,6 @@ const I18N = {
     "chat.scopeAll": "Tüm koleksiyonlar",
     "docs.title": "Bilgi tabanı",
     "docs.reindex": "Yeniden indeksle",
-    "docs.upload": "Yükle",
     "docs.dropzone": "Dosyaları buraya sürükle, ya da tıklayıp seç",
     "docs.hint":
       "Şu formatlar desteklenir: .md, .txt, .pdf, .docx. Bir dosya yükleyip silmek indeksi otomatik olarak yeniden oluşturur.",

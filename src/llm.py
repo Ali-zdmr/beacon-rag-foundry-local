@@ -1,22 +1,20 @@
-"""Chat/generation backends.
+"""Chat/generation backends: real Foundry Local, or an offline fallback.
 
-Same pattern as embeddings.py: prefer a real local model served by Microsoft
-Foundry Local (fully offline, on-device inference), fall back to a small
-extractive responder that needs no model download at all so the project is
-gradeable/runnable anywhere.
+Same pattern as embeddings.py: prefer a real local model served by Foundry
+Local, fall back to a small extractive responder that needs no model
+download at all.
 """
-
-from abc import ABC, abstractmethod
 
 from . import config
 
 
-class LLMBackend(ABC):
+class LLMBackend:
+    """Common interface: a `name` attribute and an `answer(...)` method."""
+
     name: str
 
-    @abstractmethod
     def answer(self, question: str, context_chunks: list[dict]) -> str:
-        ...
+        raise NotImplementedError
 
 
 def _build_prompt(question: str, context_chunks: list[dict]) -> str:

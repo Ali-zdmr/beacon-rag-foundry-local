@@ -352,8 +352,8 @@ button:disabled { opacity: 0.6; cursor: default; }
 
 /* Documents view */
 
-.upload-form { display: flex; gap: 8px; padding-top: 16px; align-items: center; }
-.upload-form input[type="text"] {
+.inline-form { display: flex; gap: 8px; padding-top: 16px; align-items: center; }
+.inline-form input[type="text"] {
   flex: 1;
   background: var(--panel);
   border: 1px solid var(--border);
@@ -362,8 +362,8 @@ button:disabled { opacity: 0.6; cursor: default; }
   padding: 8px 12px;
   font-size: 13px;
 }
-.upload-form input[type="text"]:focus { outline: none; border-color: var(--accent); }
-.upload-form button {
+.inline-form input[type="text"]:focus { outline: none; border-color: var(--accent); }
+.inline-form button {
   background: var(--accent);
   color: white;
   border: none;

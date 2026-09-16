@@ -7,10 +7,8 @@ pypdf
 python-docx
 
 # Optional: enables real on-device inference via Microsoft Foundry Local.
-# The app works without these (falls back to an offline hashing embedder
-# and an extractive responder) but generative answers require them.
-# Pinned to >=2.0 - src/foundry_runtime.py targets the Configuration/
-# Catalog/IModel API introduced in foundry-local-sdk 2.x, not the older
-# FoundryLocalManager(alias) shape some tutorials still show.
+# The app works without this (falls back to an offline hashing embedder
+# and an extractive responder) but generative answers require it.
+# Pinned to >=2.0 since src/foundry_runtime.py uses the Configuration/
+# Catalog/IModel API from foundry-local-sdk 2.x.
 foundry-local-sdk>=2.0.0
-openai

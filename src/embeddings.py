@@ -1,19 +1,13 @@
-"""Embedding backends.
+"""Embedding backends: real Foundry Local, or an offline fallback.
 
-FoundryLocalEmbeddings talks to a real, locally installed Microsoft Foundry
-Local runtime: it looks up the model by alias, downloads/loads it if needed,
-and uses the SDK's OpenAI-compatible embedding client - verified end-to-end
-against foundry-local-sdk 2.0.1 and a real qwen3-embedding-0.6b model.
-
-HashingEmbeddings is a pure-Python/numpy fallback with no external
-dependencies or downloads, so the whole pipeline still runs end-to-end (fully
-offline) on a machine that doesn't have Foundry Local installed yet - useful
-for development, grading, and CI.
+FoundryLocalEmbeddings looks up the model by alias, downloads/loads it if
+needed, and calls the SDK's embedding client. HashingEmbeddings is a
+pure-Python/numpy fallback with no downloads, used when Foundry Local isn't
+installed.
 """
 
 import hashlib
 import re
-from abc import ABC, abstractmethod
 
 import numpy as np
 
@@ -22,12 +16,13 @@ from . import config
 _TOKEN_RE = re.compile(r"[a-zA-ZçğıöşüÇĞİÖŞÜ0-9]+")
 
 
-class EmbeddingBackend(ABC):
+class EmbeddingBackend:
+    """Common interface: a `name` attribute and an `embed(texts)` method."""
+
     name: str
 
-    @abstractmethod
     def embed(self, texts: list[str]) -> list[list[float]]:
-        ...
+        raise NotImplementedError
 
 
 class FoundryLocalEmbeddings(EmbeddingBackend):
