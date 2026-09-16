@@ -8,28 +8,129 @@
 </head>
 <body>
   <div class="app">
-    <header class="topbar">
+    <aside class="sidebar">
       <div class="brand">
         <span class="dot"></span>
         <h1>FoundryQA</h1>
       </div>
-      <div id="status" class="status">checking status&hellip;</div>
-    </header>
 
-    <main id="log" class="log">
-      <div class="msg assistant">
-        <p>Hi! Ask me anything about the documents in <code>data/documents</code>.
-        I only answer from what's actually in the knowledge base, and I'll tell you
-        when I don't know.</p>
+      <nav class="nav">
+        <button class="nav-item active" data-view="chat">
+          <span class="nav-icon">&#128172;</span><span data-i18n="nav.chat">Chat</span>
+        </button>
+        <button class="nav-item" data-view="docs">
+          <span class="nav-icon">&#128196;</span><span data-i18n="nav.docs">Documents</span>
+        </button>
+        <button class="nav-item" data-view="settings">
+          <span class="nav-icon">&#9881;&#65039;</span><span data-i18n="nav.settings">Settings</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="offline-badge">
+          <span class="dot"></span> <span data-i18n="sidebar.offline">Offline / on-device</span>
+        </div>
+        <div id="sidebar-status" class="sidebar-status">&hellip;</div>
       </div>
-    </main>
+    </aside>
 
-    <form id="composer" class="composer">
-      <input id="question" type="text" autocomplete="off" placeholder="Ask a question..." />
-      <button type="submit">Ask</button>
-    </form>
+    <main class="content">
+
+      <!-- CHAT VIEW -->
+      <section id="view-chat" class="view active">
+        <header class="topbar">
+          <h2 data-i18n="chat.title">Ask your documents</h2>
+          <button id="btn-clear-chat" class="ghost-btn" data-i18n="chat.clear">Clear</button>
+        </header>
+
+        <div id="suggestions" class="suggestions"></div>
+
+        <div id="log" class="log">
+          <div class="msg assistant">
+            <p data-i18n="chat.welcome">
+              Hi! Ask me anything about the documents in the knowledge base.
+              I only answer from what's actually indexed, and I'll tell you when I don't know.
+            </p>
+          </div>
+        </div>
+
+        <form id="composer" class="composer">
+          <input id="question" type="text" autocomplete="off" data-i18n-placeholder="chat.placeholder" placeholder="Ask a question..." />
+          <button type="submit" data-i18n="chat.ask">Ask</button>
+        </form>
+      </section>
+
+      <!-- DOCUMENTS VIEW -->
+      <section id="view-docs" class="view">
+        <header class="topbar">
+          <h2 data-i18n="docs.title">Knowledge base</h2>
+          <button id="btn-reindex" class="ghost-btn" data-i18n="docs.reindex">Reindex</button>
+        </header>
+
+        <form id="upload-form" class="upload-form">
+          <input id="upload-input" type="file" accept=".md,.txt" />
+          <button type="submit" data-i18n="docs.upload">Upload</button>
+        </form>
+        <p class="hint" data-i18n="docs.hint">
+          Only .md and .txt files are supported. Uploading or deleting a file automatically rebuilds the index.
+        </p>
+
+        <ul id="doc-list" class="doc-list"></ul>
+      </section>
+
+      <!-- SETTINGS VIEW -->
+      <section id="view-settings" class="view">
+        <header class="topbar">
+          <h2 data-i18n="settings.title">Settings</h2>
+        </header>
+
+        <div class="settings-grid">
+          <div class="setting-row">
+            <label data-i18n="settings.topk">Passages retrieved per question (top-k)</label>
+            <div class="setting-control">
+              <input id="setting-topk" type="range" min="1" max="8" step="1" value="3" />
+              <span id="setting-topk-value">3</span>
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <label data-i18n="settings.showSources">Show retrieved passages under each answer</label>
+            <div class="setting-control">
+              <input id="setting-show-sources" type="checkbox" checked />
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <label data-i18n="settings.theme">Theme</label>
+            <div class="setting-control">
+              <select id="setting-theme">
+                <option value="dark" data-i18n="settings.themeDark">Dark</option>
+                <option value="light" data-i18n="settings.themeLight">Light</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <label data-i18n="settings.language">Language</label>
+            <div class="setting-control">
+              <select id="setting-lang">
+                <option value="tr">Türkçe</option>
+                <option value="en">English</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="backend-card">
+          <h3 data-i18n="settings.backends">Active backends</h3>
+          <div id="backend-details" class="backend-details">&hellip;</div>
+        </div>
+      </section>
+
+    </main>
   </div>
 
+  <script src="{{ url_for('static', filename='i18n.js') }}"></script>
   <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
 </html>

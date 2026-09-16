@@ -9,7 +9,7 @@ from pathlib import Path
 
 from . import config, db
 from .chunking import split_into_chunks
-from .embeddings import get_embedding_backend
+from .embeddings import EmbeddingBackend, get_embedding_backend
 
 SUPPORTED_EXTENSIONS = {".md", ".txt"}
 
@@ -31,7 +31,12 @@ def title_from_text(filename: str, text: str) -> str:
     return filename
 
 
-def run(docs_dir: Path, db_path: Path, reset: bool = True) -> None:
+def run(
+    docs_dir: Path,
+    db_path: Path,
+    reset: bool = True,
+    embedder: EmbeddingBackend | None = None,
+) -> None:
     if not docs_dir.exists():
         raise SystemExit(f"Documents directory not found: {docs_dir}")
 
@@ -39,7 +44,7 @@ def run(docs_dir: Path, db_path: Path, reset: bool = True) -> None:
     if not documents:
         raise SystemExit(f"No .md or .txt files found in {docs_dir}")
 
-    embedder = get_embedding_backend()
+    embedder = embedder or get_embedding_backend()
     db.init_db(db_path, reset=reset)
 
     total_chunks = 0

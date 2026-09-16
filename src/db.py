@@ -90,3 +90,14 @@ def count_chunks(conn: sqlite3.Connection) -> int:
 
 def count_documents(conn: sqlite3.Connection) -> int:
     return conn.execute("SELECT COUNT(*) AS c FROM documents").fetchone()["c"]
+
+
+def list_documents_with_counts(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+    return conn.execute(
+        """
+        SELECT documents.filename, documents.title, COUNT(chunks.id) AS chunk_count
+        FROM documents LEFT JOIN chunks ON chunks.doc_id = documents.id
+        GROUP BY documents.id
+        ORDER BY documents.filename
+        """
+    ).fetchall()
