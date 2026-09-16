@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FoundryQA - Local Document Assistant</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="dot"></span>
+        <h1>FoundryQA</h1>
+      </div>
+      <div id="status" class="status">checking status&hellip;</div>
+    </header>
+
+    <main id="log" class="log">
+      <div class="msg assistant">
+        <p>Hi! Ask me anything about the documents in <code>data/documents</code>.
+        I only answer from what's actually in the knowledge base, and I'll tell you
+        when I don't know.</p>
+      </div>
+    </main>
+
+    <form id="composer" class="composer">
+      <input id="question" type="text" autocomplete="off" placeholder="Ask a question..." />
+      <button type="submit">Ask</button>
+    </form>
+  </div>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
