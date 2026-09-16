@@ -24,6 +24,9 @@
         <button class="nav-item" data-view="settings">
           <span class="nav-icon">&#9881;&#65039;</span><span data-i18n="nav.settings">Settings</span>
         </button>
+        <button class="nav-item" data-view="about">
+          <span class="nav-icon">&#128161;</span><span data-i18n="nav.about">About</span>
+        </button>
       </nav>
 
       <div class="sidebar-footer">
@@ -41,7 +44,10 @@
       <section id="view-chat" class="view active">
         <header class="topbar">
           <h2 data-i18n="chat.title">Ask your documents</h2>
-          <button id="btn-clear-chat" class="ghost-btn" data-i18n="chat.clear">Clear</button>
+          <div class="topbar-actions">
+            <button id="btn-export-chat" class="ghost-btn" data-i18n="chat.export">Export</button>
+            <button id="btn-clear-chat" class="ghost-btn" data-i18n="chat.clear">Clear</button>
+          </div>
         </header>
 
         <div id="suggestions" class="suggestions"></div>
@@ -68,6 +74,8 @@
           <button id="btn-reindex" class="ghost-btn" data-i18n="docs.reindex">Reindex</button>
         </header>
 
+        <div id="doc-stats" class="doc-stats"></div>
+
         <form id="upload-form" class="upload-form">
           <input id="upload-input" type="file" accept=".md,.txt" />
           <button type="submit" data-i18n="docs.upload">Upload</button>
@@ -75,6 +83,8 @@
         <p class="hint" data-i18n="docs.hint">
           Only .md and .txt files are supported. Uploading or deleting a file automatically rebuilds the index.
         </p>
+
+        <input id="doc-search" type="text" class="doc-search" data-i18n-placeholder="docs.search" placeholder="Filter documents..." />
 
         <ul id="doc-list" class="doc-list"></ul>
       </section>
@@ -125,6 +135,63 @@
         <div class="backend-card">
           <h3 data-i18n="settings.backends">Active backends</h3>
           <div id="backend-details" class="backend-details">&hellip;</div>
+        </div>
+
+        <div class="backend-card">
+          <h3 data-i18n="settings.pipeline">Pipeline configuration</h3>
+          <div id="pipeline-details" class="backend-details">&hellip;</div>
+        </div>
+      </section>
+
+      <!-- ABOUT VIEW -->
+      <section id="view-about" class="view">
+        <header class="topbar">
+          <h2 data-i18n="about.title">How Beacon works</h2>
+        </header>
+
+        <p class="hint" data-i18n="about.intro">
+          Beacon never answers from memory - every answer is grounded in the documents
+          you've indexed. Here's the pipeline behind each question:
+        </p>
+
+        <div class="pipeline">
+          <div class="pipeline-step">
+            <div class="pipeline-icon">&#9986;&#65039;</div>
+            <div class="pipeline-label" data-i18n="about.step1Title">1. Chunking</div>
+            <div class="pipeline-desc" data-i18n="about.step1Desc">Documents are split into overlapping paragraph-sized passages.</div>
+          </div>
+          <div class="pipeline-arrow">&#8594;</div>
+          <div class="pipeline-step">
+            <div class="pipeline-icon">&#128290;</div>
+            <div class="pipeline-label" data-i18n="about.step2Title">2. Embedding</div>
+            <div class="pipeline-desc" data-i18n="about.step2Desc">Each passage becomes a numeric vector capturing its meaning.</div>
+          </div>
+          <div class="pipeline-arrow">&#8594;</div>
+          <div class="pipeline-step">
+            <div class="pipeline-icon">&#128451;&#65039;</div>
+            <div class="pipeline-label" data-i18n="about.step3Title">3. SQLite</div>
+            <div class="pipeline-desc" data-i18n="about.step3Desc">Passages and vectors are stored locally in a single database file.</div>
+          </div>
+          <div class="pipeline-arrow">&#8594;</div>
+          <div class="pipeline-step">
+            <div class="pipeline-icon">&#128269;</div>
+            <div class="pipeline-label" data-i18n="about.step4Title">4. Retrieval</div>
+            <div class="pipeline-desc" data-i18n="about.step4Desc">Your question is compared against every vector to find the closest matches.</div>
+          </div>
+          <div class="pipeline-arrow">&#8594;</div>
+          <div class="pipeline-step">
+            <div class="pipeline-icon">&#128161;</div>
+            <div class="pipeline-label" data-i18n="about.step5Title">5. Generation</div>
+            <div class="pipeline-desc" data-i18n="about.step5Desc">A local model answers using only the retrieved passages as context.</div>
+          </div>
+        </div>
+
+        <div class="backend-card">
+          <h3 data-i18n="about.stackTitle">Built with</h3>
+          <div class="backend-details" data-i18n="about.stackDesc">
+            Python, SQLite, Flask, numpy - and Microsoft Foundry Local for on-device
+            inference when it's installed (with an offline fallback when it isn't).
+          </div>
         </div>
       </section>
 

@@ -1,6 +1,6 @@
 // ---- persisted settings -----------------------------------------------
 
-const SETTINGS_KEY = "foundryqa.settings";
+const SETTINGS_KEY = "beacon.settings";
 
 function loadSettings() {
   const defaults = { theme: "dark", lang: "tr", topK: 3, showSources: true };
@@ -21,6 +21,7 @@ function saveSettings(settings) {
 }
 
 let settings = loadSettings();
+let lastStatus = null;
 
 function applyTheme(theme) {
   document.documentElement.setAttribute("data-theme", theme);
@@ -37,7 +38,10 @@ const question = document.getElementById("question");
 const suggestionsEl = document.getElementById("suggestions");
 const sidebarStatus = document.getElementById("sidebar-status");
 const btnClearChat = document.getElementById("btn-clear-chat");
+const btnExportChat = document.getElementById("btn-export-chat");
 
+const docStats = document.getElementById("doc-stats");
+const docSearch = document.getElementById("doc-search");
 const docList = document.getElementById("doc-list");
 const uploadForm = document.getElementById("upload-form");
 const uploadInput = document.getElementById("upload-input");
@@ -49,6 +53,7 @@ const showSourcesInput = document.getElementById("setting-show-sources");
 const themeSelect = document.getElementById("setting-theme");
 const langSelect = document.getElementById("setting-lang");
 const backendDetails = document.getElementById("backend-details");
+const pipelineDetails = document.getElementById("pipeline-details");
 
 // ---- navigation -----------------------------------------------------------
 
@@ -65,7 +70,12 @@ navItems.forEach((btn) => {
 
 // ---- chat -----------------------------------------------------------------
 
-function addMessage(role, text, chunks) {
+function formatTime(date) {
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function addMessage(role, text, options = {}) {
+  const { chunks, elapsedMs } = options;
   const div = document.createElement("div");
   div.className = `msg ${role}`;
   const p = document.createElement("p");
@@ -94,14 +104,52 @@ function addMessage(role, text, chunks) {
     div.appendChild(wrap);
   }
 
+  if (role === "user" || role === "assistant") {
+    const meta = document.createElement("div");
+    meta.className = "msg-meta";
+    let metaText = formatTime(new Date());
+    if (typeof elapsedMs === "number") metaText += ` - ${elapsedMs} ms`;
+    const timeSpan = document.createElement("span");
+    timeSpan.textContent = metaText;
+    meta.appendChild(timeSpan);
+
+    if (role === "assistant") {
+      const copyBtn = document.createElement("button");
+      copyBtn.className = "msg-copy-btn";
+      copyBtn.textContent = t(settings.lang, "chat.copy");
+      copyBtn.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(text);
+          copyBtn.textContent = t(settings.lang, "chat.copied");
+          setTimeout(() => (copyBtn.textContent = t(settings.lang, "chat.copy")), 1500);
+        } catch (err) {
+          /* clipboard unavailable - ignore */
+        }
+      });
+      meta.appendChild(copyBtn);
+    }
+    div.appendChild(meta);
+  }
+
   log.appendChild(div);
   log.scrollTop = log.scrollHeight;
+  return div;
+}
+
+function addTypingIndicator() {
+  const div = document.createElement("div");
+  div.className = "msg assistant typing-msg";
+  div.innerHTML = `<span class="typing-dots"><span></span><span></span><span></span></span>`;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+  return div;
 }
 
 async function ask(text) {
   addMessage("user", text);
   question.value = "";
   question.disabled = true;
+  const typingEl = addTypingIndicator();
 
   try {
     const res = await fetch("/api/ask", {
@@ -110,12 +158,14 @@ async function ask(text) {
       body: JSON.stringify({ question: text, top_k: settings.topK }),
     });
     const data = await res.json();
+    typingEl.remove();
     if (!res.ok) {
       addMessage("error", data.error || t(settings.lang, "chat.noAnswer"));
     } else {
-      addMessage("assistant", data.answer, data.chunks);
+      addMessage("assistant", data.answer, { chunks: data.chunks, elapsedMs: data.elapsed_ms });
     }
   } catch (err) {
+    typingEl.remove();
     addMessage("error", t(settings.lang, "chat.noServer"));
   } finally {
     question.disabled = false;
@@ -136,6 +186,22 @@ btnClearChat.addEventListener("click", () => {
   div.innerHTML = `<p data-i18n="chat.welcome"></p>`;
   log.appendChild(div);
   applyI18n(settings.lang);
+});
+
+btnExportChat.addEventListener("click", () => {
+  const lines = [];
+  log.querySelectorAll(".msg").forEach((el) => {
+    const roleLabel = el.classList.contains("user") ? "You" : "Beacon";
+    const text = el.querySelector("p")?.textContent || "";
+    if (text) lines.push(`**${roleLabel}:** ${text}`);
+  });
+  const blob = new Blob([lines.join("\n\n")], { type: "text/markdown" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "beacon-conversation.md";
+  a.click();
+  URL.revokeObjectURL(url);
 });
 
 const SUGGESTION_QUESTIONS = [
@@ -159,38 +225,114 @@ function renderSuggestions() {
 
 // ---- documents --------------------------------------------------------
 
-async function loadDocuments() {
+let allDocuments = [];
+
+function renderDocStats() {
+  const totalDocs = allDocuments.length;
+  const totalChunks = allDocuments.reduce((sum, d) => sum + d.chunk_count, 0);
+  const avg = totalDocs ? (totalChunks / totalDocs).toFixed(1) : "0";
+  docStats.innerHTML = `
+    <div><strong>${totalDocs}</strong>${t(settings.lang, "docs.statsTotal")}</div>
+    <div><strong>${totalChunks}</strong>${t(settings.lang, "docs.statsChunks")}</div>
+    <div><strong>${avg}</strong>${t(settings.lang, "docs.statsAvg")}</div>
+  `;
+}
+
+function renderDocList() {
+  const filter = (docSearch.value || "").toLowerCase();
+  const filtered = allDocuments.filter(
+    (d) => d.title.toLowerCase().includes(filter) || d.filename.toLowerCase().includes(filter)
+  );
+
   docList.innerHTML = "";
+  if (!allDocuments.length) {
+    docList.innerHTML = `<li class="hint">${t(settings.lang, "docs.empty")}</li>`;
+    return;
+  }
+  if (!filtered.length) {
+    docList.innerHTML = `<li class="hint">${t(settings.lang, "docs.noMatch")}</li>`;
+    return;
+  }
+
+  filtered.forEach((doc) => {
+    const li = document.createElement("li");
+    li.className = "doc-row";
+
+    const main = document.createElement("div");
+    main.className = "doc-row-main";
+
+    const info = document.createElement("div");
+    info.className = "doc-info";
+    info.innerHTML =
+      `<div class="doc-title">${doc.title}</div>` +
+      `<div class="doc-meta">${doc.filename} - ${doc.chunk_count} ${t(settings.lang, "docs.chunks")}</div>`;
+
+    const actions = document.createElement("div");
+    actions.className = "doc-row-actions";
+
+    const previewBtn = document.createElement("button");
+    previewBtn.className = "ghost-btn";
+    previewBtn.textContent = t(settings.lang, "docs.preview");
+
+    const del = document.createElement("button");
+    del.className = "doc-delete";
+    del.textContent = t(settings.lang, "docs.delete");
+    del.addEventListener("click", (e) => {
+      e.stopPropagation();
+      deleteDocument(doc.filename);
+    });
+
+    actions.appendChild(previewBtn);
+    actions.appendChild(del);
+    main.appendChild(info);
+    main.appendChild(actions);
+    li.appendChild(main);
+
+    const previewWrap = document.createElement("div");
+    previewWrap.style.display = "none";
+    li.appendChild(previewWrap);
+
+    previewBtn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const isOpen = previewWrap.style.display !== "none";
+      if (isOpen) {
+        previewWrap.style.display = "none";
+        return;
+      }
+      if (!previewWrap.dataset.loaded) {
+        const res = await fetch(`/api/documents/${encodeURIComponent(doc.filename)}/chunks`);
+        const data = await res.json();
+        previewWrap.className = "doc-preview";
+        previewWrap.innerHTML = "";
+        (data.chunks || []).forEach((c) => {
+          const chunkEl = document.createElement("div");
+          chunkEl.className = "doc-chunk";
+          const preview = c.text.length > 200 ? c.text.slice(0, 200) + "..." : c.text;
+          chunkEl.innerHTML = `<span class="chunk-index">#${c.index}</span>${preview}`;
+          previewWrap.appendChild(chunkEl);
+        });
+        previewWrap.dataset.loaded = "1";
+      }
+      previewWrap.style.display = "flex";
+    });
+
+    docList.appendChild(li);
+  });
+}
+
+async function loadDocuments() {
   try {
     const res = await fetch("/api/documents");
     const data = await res.json();
-    if (!data.documents || !data.documents.length) {
-      const li = document.createElement("li");
-      li.className = "hint";
-      li.textContent = t(settings.lang, "docs.empty");
-      docList.appendChild(li);
-      return;
-    }
-    data.documents.forEach((doc) => {
-      const li = document.createElement("li");
-      li.className = "doc-row";
-      const info = document.createElement("div");
-      info.className = "doc-info";
-      info.innerHTML =
-        `<div class="doc-title">${doc.title}</div>` +
-        `<div class="doc-meta">${doc.filename} - ${doc.chunk_count} ${t(settings.lang, "docs.chunks")}</div>`;
-      const del = document.createElement("button");
-      del.className = "doc-delete";
-      del.textContent = t(settings.lang, "docs.delete");
-      del.addEventListener("click", () => deleteDocument(doc.filename));
-      li.appendChild(info);
-      li.appendChild(del);
-      docList.appendChild(li);
-    });
+    allDocuments = data.documents || [];
+    renderDocStats();
+    renderDocList();
   } catch (err) {
     docList.innerHTML = `<li class="hint">${t(settings.lang, "chat.noServer")}</li>`;
   }
 }
+
+docSearch.addEventListener("input", renderDocList);
 
 async function deleteDocument(filename) {
   await fetch(`/api/documents/${encodeURIComponent(filename)}`, { method: "DELETE" });
@@ -246,19 +388,34 @@ langSelect.addEventListener("change", () => {
   settings.lang = langSelect.value;
   applyI18n(settings.lang);
   renderSuggestions();
+  if (allDocuments.length || docList.children.length) {
+    renderDocStats();
+    renderDocList();
+  }
+  if (lastStatus) renderBackendDetails(lastStatus);
   saveSettings(settings);
 });
 
 // ---- status ---------------------------------------------------------------
 
+function renderBackendDetails(data) {
+  backendDetails.innerHTML =
+    `embeddings: <code>${data.embedding_backend}</code><br>` +
+    `model: <code>${data.llm_backend}</code>`;
+  pipelineDetails.innerHTML =
+    `LLM alias: <code>${data.llm_alias}</code><br>` +
+    `Embedding alias: <code>${data.embedding_alias}</code><br>` +
+    `Chunk size / overlap: <code>${data.chunk_max_chars} / ${data.chunk_overlap_chars}</code> chars<br>` +
+    `Default top-k: <code>${data.default_top_k}</code>`;
+}
+
 async function loadStatus() {
   try {
     const res = await fetch("/api/status");
     const data = await res.json();
+    lastStatus = data;
     sidebarStatus.textContent = `${data.documents} docs - ${data.chunks} chunks`;
-    backendDetails.innerHTML =
-      `embeddings: <code>${data.embedding_backend}</code><br>` +
-      `model: <code>${data.llm_backend}</code>`;
+    renderBackendDetails(data);
   } catch (err) {
     sidebarStatus.textContent = "offline";
   }

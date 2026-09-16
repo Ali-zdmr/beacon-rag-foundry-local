@@ -1,15 +1,17 @@
 """Flask web UI for the local RAG assistant.
 
-Three views in one page: Chat (ask questions, see cited/retrieved passages),
-Documents (see what's indexed, upload new .md/.txt files, delete, reindex),
-and Settings (top-k, whether to show retrieved passages, theme, language).
-Everything here is a thin wrapper around the same src.* pipeline used by the
-CLI - no logic lives only in the web layer.
+Four views in one page: Chat (ask questions, see cited/retrieved passages),
+Documents (see what's indexed, upload new .md/.txt files, delete, reindex,
+preview a document's chunks), Settings (top-k, whether to show retrieved
+passages, theme, language, active model info), and About (a short pipeline
+explainer for presentations). Everything here is a thin wrapper around the
+same src.* pipeline used by the CLI - no logic lives only in the web layer.
 
 Usage:
     python -m src.webapp
 """
 
+import time
 from pathlib import Path
 
 from flask import Flask, jsonify, request, render_template
@@ -70,6 +72,10 @@ def status():
             "documents": num_docs,
             "chunks": num_chunks,
             "default_top_k": config.TOP_K,
+            "llm_alias": config.LLM_MODEL_ALIAS,
+            "embedding_alias": config.EMBEDDING_MODEL_ALIAS,
+            "chunk_max_chars": config.CHUNK_MAX_CHARS,
+            "chunk_overlap_chars": config.CHUNK_OVERLAP_CHARS,
         }
     )
 
@@ -82,6 +88,19 @@ def list_documents():
         with db.connect(db_path) as conn:
             documents = [dict(row) for row in db.list_documents_with_counts(conn)]
     return jsonify({"documents": documents})
+
+
+@app.get("/api/documents/<path:filename>/chunks")
+def document_chunks(filename):
+    safe_name = secure_filename(filename)
+    db_path = Path(config.DB_PATH)
+    if not db_path.exists():
+        return jsonify({"chunks": []})
+    with db.connect(db_path) as conn:
+        rows = db.fetch_chunks_for_document(conn, safe_name)
+    return jsonify(
+        {"chunks": [{"index": r["chunk_index"], "text": r["text"]} for r in rows]}
+    )
 
 
 @app.post("/api/documents")
@@ -144,10 +163,12 @@ def ask():
     top_k = max(1, min(top_k, 10))
 
     embedder, llm = _backends()
+    started = time.perf_counter()
     try:
         result = answer_question(question, k=top_k, embedder=embedder, llm=llm)
     except EmbeddingBackendMismatch as exc:
         return jsonify({"error": str(exc)}), 409
+    result["elapsed_ms"] = round((time.perf_counter() - started) * 1000)
 
     return jsonify(result)
 

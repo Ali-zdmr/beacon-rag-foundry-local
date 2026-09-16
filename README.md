@@ -103,17 +103,22 @@ python -m src.webapp
 # open http://127.0.0.1:5000
 ```
 
-The web UI has three tabs:
-- **Chat** - ask questions, with example question chips and expandable
-  retrieved-passage cards (source + similarity score) under each answer.
-- **Documents** - see every indexed file and its chunk count, upload a new
-  `.md`/`.txt` file (the index rebuilds automatically), delete a file, or
-  force a manual reindex.
+The web UI has four tabs:
+- **Chat** - ask questions, with example question chips, a typing indicator,
+  per-message timestamps and response time, a copy button, expandable
+  retrieved-passage cards (source + similarity score) under each answer,
+  and a button to export the conversation as Markdown.
+- **Documents** - a stats bar (documents / chunks / avg. chunks per doc), a
+  filter box, upload a new `.md`/`.txt` file (the index rebuilds
+  automatically), preview a document's indexed chunks inline, delete a
+  file, or force a manual reindex.
 - **Settings** - adjust top-k (how many passages are retrieved per
   question), toggle whether retrieved passages are shown, switch between
   dark/light theme and Turkish/English, and see which embedding/LLM
-  backends are currently active. Settings persist in the browser
-  (`localStorage`) between visits.
+  backends and model aliases are currently active. Settings persist in the
+  browser (`localStorage`) between visits.
+- **About** - a short pipeline explainer (chunking -> embedding -> SQLite ->
+  retrieval -> generation), handy for the assignment's final presentation.
 
 ## Tests
 

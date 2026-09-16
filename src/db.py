@@ -92,6 +92,18 @@ def count_documents(conn: sqlite3.Connection) -> int:
     return conn.execute("SELECT COUNT(*) AS c FROM documents").fetchone()["c"]
 
 
+def fetch_chunks_for_document(conn: sqlite3.Connection, filename: str) -> list[sqlite3.Row]:
+    return conn.execute(
+        """
+        SELECT chunks.chunk_index, chunks.text
+        FROM chunks JOIN documents ON chunks.doc_id = documents.id
+        WHERE documents.filename = ?
+        ORDER BY chunks.chunk_index
+        """,
+        (filename,),
+    ).fetchall()
+
+
 def list_documents_with_counts(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     return conn.execute(
         """
