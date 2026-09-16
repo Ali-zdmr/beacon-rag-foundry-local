@@ -5,6 +5,7 @@ const I18N = {
     "nav.tests": "Tests",
     "nav.settings": "Settings",
     "nav.about": "About",
+    "brand.tagline": "Only lights what's real",
     "sidebar.offline": "Offline / on-device",
     "chat.title": "Ask your documents",
     "chat.clear": "Clear",
@@ -66,6 +67,10 @@ const I18N = {
     "settings.backends": "Active backends",
     "settings.pipeline": "Pipeline configuration",
     "about.title": "How Beacon works",
+    "about.nameQuote":
+      "A beacon lights the rocks that are actually there - it doesn't throw light " +
+      "into open water and pretend something's there. That's the one rule Beacon " +
+      "follows: answer what's real, and say so plainly when nothing is.",
     "about.intro":
       "Beacon never answers from memory - every answer is grounded in the documents " +
       "you've indexed. Here's the pipeline behind each question:",
@@ -90,6 +95,7 @@ const I18N = {
     "nav.tests": "Testler",
     "nav.settings": "Ayarlar",
     "nav.about": "Hakkında",
+    "brand.tagline": "Yalnızca gerçekten var olanı aydınlatır",
     "sidebar.offline": "Çevrimdışı / cihaz üzerinde",
     "chat.title": "Belgelerine soru sor",
     "chat.clear": "Temizle",
@@ -151,6 +157,10 @@ const I18N = {
     "settings.backends": "Aktif motorlar",
     "settings.pipeline": "Boru hattı yapılandırması",
     "about.title": "Beacon nasıl çalışır",
+    "about.nameQuote":
+      "Bir deniz feneri, orada gerçekten var olan kayalıkları aydınlatır - açık " +
+      "sulara ışık tutup orada bir şey varmış gibi davranmaz. Beacon'ın tek kuralı " +
+      "da bu: gerçekten var olanı cevapla, hiçbir şey yoksa bunu açıkça söyle.",
     "about.intro":
       "Beacon hiçbir zaman hafızasından cevap vermez - her cevap, indekslediğin belgelere " +
       "dayanır. İşte her sorunun arkasındaki adımlar:",
