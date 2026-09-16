@@ -1,5 +1,13 @@
 # Beacon - Local RAG Document Assistant
 
+![Python](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)
+![Flask](https://img.shields.io/badge/Flask-3.x-000000?logo=flask&logoColor=white)
+![Microsoft Foundry Local](https://img.shields.io/badge/Microsoft-Foundry%20Local-0078D4?logo=microsoft&logoColor=white)
+![Offline First](https://img.shields.io/badge/offline--first-yes-34D399)
+![Verified](https://img.shields.io/badge/Foundry%20Local-verified%20end--to--end-success)
+
+![Beacon chat screenshot - a real question answered by a real Foundry Local model, with source citations, a confidence score, and response time](docs/screenshots/chat.png)
+
 A small, fully offline-capable Q&A assistant built for the Microsoft summer
 program "Building Your First Local RAG Application with Foundry Local". Like
 a lighthouse beam, it only lights up what's actually there: it answers
@@ -190,32 +198,56 @@ python -m src.webapp
 ```
 
 The web UI has five tabs:
-- **Chat** - a scope dropdown to ask about one collection or all of them,
-  example question chips, a typing indicator, a typewriter reveal on the
-  answer, per-message timestamps and response time, a copy button, a
-  confidence badge (based on the top retrieved passage's similarity score),
-  expandable retrieved-passage cards (source + score) under each answer,
-  and a button to export the conversation as Markdown.
-- **Documents** - a stats bar (documents / chunks / avg. chunks per doc),
-  documents grouped by collection with a name field for uploads and a
-  per-collection delete button, a filter box, a drag-and-drop zone (or
-  click to browse, multiple files at once - the index rebuilds
-  automatically), preview a document's indexed chunks inline, delete a
-  file, or force a manual reindex.
-- **Tests** - the assignment's Phase 3 test set made concrete: add a
-  question plus what you expect ("should cite doc X", "should say it
-  doesn't know"), run it (or run all) against the live pipeline, and mark
-  each result pass/fail. Seeded with three example cases in
-  `data/test_cases.json`, including one that's deliberately out of scope so
-  you can check the assistant refuses to guess.
-- **Settings** - adjust top-k (how many passages are retrieved per
-  question), the low-confidence similarity threshold, toggle whether
-  retrieved passages are shown, switch between dark/light theme and
-  Turkish/English, and see which embedding/LLM backends and model aliases
-  are currently active. Settings persist in the browser (`localStorage`)
-  between visits.
-- **About** - a short pipeline explainer (chunking -> embedding -> SQLite ->
-  retrieval -> generation), handy for the assignment's final presentation.
+
+### Chat
+
+![Chat tab with the scope dropdown, suggestion chips, and a real generated answer](docs/screenshots/chat.png)
+
+A scope dropdown to ask about one collection or all of them, example
+question chips, a typing indicator, a typewriter reveal on the answer,
+per-message timestamps and response time, a copy button, a confidence badge
+(based on the top retrieved passage's similarity score), expandable
+retrieved-passage cards (source + score) under each answer, and a button to
+export the conversation as Markdown.
+
+### Documents
+
+![Documents tab showing files grouped by collection (General and Cars), with upload/preview/delete controls](docs/screenshots/documents.png)
+
+A stats bar (documents / chunks / avg. chunks per doc), documents grouped by
+collection with a name field for uploads and a per-collection delete button,
+a filter box, a drag-and-drop zone (or click to browse, multiple files at
+once - the index rebuilds automatically), preview a document's indexed
+chunks inline, delete a file, or force a manual reindex.
+
+### Tests
+
+![Tests tab showing three seeded test cases run against the real model, all marked passed](docs/screenshots/tests.png)
+
+The assignment's Phase 3 test set made concrete: add a question plus what
+you expect ("should cite doc X", "should say it doesn't know"), run it (or
+run all) against the live pipeline, and mark each result pass/fail. Seeded
+with three example cases in `data/test_cases.json`, including one that's
+deliberately out of scope - in the screenshot above, the real model
+correctly refused it ("The provided context does not contain information
+about the capital of France") instead of guessing.
+
+### Settings
+
+![Settings tab showing top-k, confidence threshold, theme/language, and the active Foundry Local backends and model aliases](docs/screenshots/settings.png)
+
+Adjust top-k (how many passages are retrieved per question), the
+low-confidence similarity threshold, toggle whether retrieved passages are
+shown, switch between dark/light theme and Turkish/English, and see which
+embedding/LLM backends and model aliases are currently active. Settings
+persist in the browser (`localStorage`) between visits.
+
+### About
+
+![About tab showing the five-step pipeline diagram: Chunking, Embedding, SQLite, Retrieval, Generation](docs/screenshots/about.png)
+
+A short pipeline explainer (chunking -> embedding -> SQLite -> retrieval ->
+generation), handy for the assignment's final presentation.
 
 ## Tests
 
